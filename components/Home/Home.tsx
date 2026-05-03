@@ -76,8 +76,7 @@ const Home = () => {
       <HomeInsuranceSection />
 
       {/* Section 3 - Services */}
-      {/* <HomeInvestmentSection /> */}
-      <InvestmentSection />
+      {/* <InvestmentSection /> */}
 
       {/* <CowPurchaseSection /> */}
 
