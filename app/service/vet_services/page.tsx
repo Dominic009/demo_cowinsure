@@ -604,13 +604,21 @@ const VetService = () => {
                   <label className="text-sm font-medium text-slate-600">
                     Mobile Number
                   </label>
-                  <input
+                 <input
+                   type="tel"
                     value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    required
-                    placeholder="01XXXXXXXXX"
-                    className="mt-1 w-full rounded-md border text-black border-slate-300 px-2 py-1 focus:border-green-600 focus:ring-2 focus:ring-green-500/30 outline-none transition"
-                  />
+                    onChange={(e) => {
+                    const val = e.target.value;
+
+            if (/^[0-9]*$/.test(val)) {
+                setMobile(val);
+    }
+  }}
+  required
+  placeholder="01XXXXXXXXX"
+  maxLength={11}
+  className="mt-1 w-full rounded-md border text-black border-slate-300 px-2 py-1 focus:border-green-600 focus:ring-2 focus:ring-green-500/30 outline-none transition"
+/>
                 </div>
 
                 {formFields.map((field) => {

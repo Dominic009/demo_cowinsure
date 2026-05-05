@@ -8,7 +8,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import BackgroundImageLayer from "../common/BackgroundImageLayer";
 
-// Register ScrollTrigger plugin
+// Register GSAP ScrollTrigger plugin for client-side usage
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
@@ -51,7 +51,7 @@ const CardsSection: React.FC = () => {
   const [whatWeOfferData, setWhatWeOfferData] = useState<BaseCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Refs for GSAP animations
+  // Animation Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const iconRef = useRef<HTMLDivElement>(null);
   const subtitleRef = useRef<HTMLHeadingElement>(null);
@@ -79,7 +79,7 @@ const CardsSection: React.FC = () => {
           setIsLoading(false);
         }
       } catch (error) {
-        console.error("Error fetching base categories: ", error);
+        console.error("Error fetching base categories:", error);
         setIsLoading(false);
       }
     };
@@ -94,7 +94,7 @@ const CardsSection: React.FC = () => {
           setWhatWeOfferData(result.data);
         }
       } catch (error) {
-        console.error("Error fetching base cards: ", error);
+        console.error("Error fetching base cards:", error);
       } finally {
         setIsLoading(false);
       }
@@ -103,103 +103,68 @@ const CardsSection: React.FC = () => {
     fetchBaseCategories();
   }, []);
 
-  // GSAP ScrollTrigger animations
+  // GSAP Animation Logic
   useEffect(() => {
     if (!isLoading && whatWeOfferData.length > 0) {
       const ctx = gsap.context(() => {
-        // Set initial states
-        // Header elements (icon, subtitle, title) start from top (-100px) and invisible
+        // Initial states: Hidden and offset
         gsap.set([iconRef.current, subtitleRef.current, titleRef.current], {
           y: -100,
           opacity: 0,
         });
 
-        // Cards container starts from left (-100px) and invisible
         gsap.set(cardsContainerRef.current, {
           x: -100,
           opacity: 0,
         });
 
-        // Individual cards start invisible and scaled down
         gsap.set(cardRefs.current, {
           opacity: 0,
           scale: 0.8,
           y: 50,
         });
 
-        // Create timeline for sequential animations
         const tl = gsap.timeline({
           scrollTrigger: {
             trigger: containerRef.current,
             start: "top 80%",
             end: "bottom 20%",
             toggleActions: "play none none reverse",
-            // markers: true,
           },
         });
 
-        // Icon animation - falls from top
         tl.to(iconRef.current, {
           duration: 0.35,
           y: 0,
           opacity: 1,
           ease: "power2.out",
-        });
-
-        // Subtitle animation - falls from top
-        tl.to(
-          subtitleRef.current,
-          {
-            duration: 0.35,
-            delay: 0.35,
-            y: 0,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.5"
-        );
-
-        // Title animation - falls from top
-        tl.to(
-          titleRef.current,
-          {
-            duration: 0.35,
-            delay: 0.35,
-            y: 0,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.5"
-        );
-
-        // Cards container animation - slides from left
-        tl.to(
-          cardsContainerRef.current,
-          {
-            duration: 0.5,
-            x: 0,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.3"
-        );
-
-        // Individual cards animation - staggered appearance
-        tl.to(
-          cardRefs.current,
-          {
-            duration: 0.25,
-            opacity: 1,
-            scale: 1,
-            y: 0,
-            ease: "back.out(1.7)",
-            stagger: {
-              amount: 0.5, // Total time to stagger all cards
-              from: "start", // Start from first card
-            },
-          },
-          "-=0.5"
-        );
+        })
+        .to(subtitleRef.current, {
+          duration: 0.35,
+          y: 0,
+          opacity: 1,
+          ease: "power2.out",
+        }, "-=0.2")
+        .to(titleRef.current, {
+          duration: 0.35,
+          y: 0,
+          opacity: 1,
+          ease: "power2.out",
+        }, "-=0.2")
+        .to(cardsContainerRef.current, {
+          duration: 0.5,
+          x: 0,
+          opacity: 1,
+          ease: "power2.out",
+        }, "-=0.3")
+        .to(cardRefs.current, {
+          duration: 0.25,
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          ease: "back.out(1.7)",
+          stagger: 0.1
+        }, "-=0.3");
       }, containerRef);
 
       return () => ctx.revert();
@@ -209,7 +174,7 @@ const CardsSection: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-[700px] relative flex items-center justify-center">
-      <BackgroundImageLayer imageUrl='/village3.png' opacity={0.1} size="80%"/>
+        <BackgroundImageLayer imageUrl='/village3.png' opacity={0.1} size="80%"/>
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Loading services...</p>
@@ -221,35 +186,32 @@ const CardsSection: React.FC = () => {
   return (
     <div ref={containerRef} className="relative py-10">
       <BackgroundImageLayer imageUrl='/village3.png' opacity={0.1} size="80%"/>
+      
+      {/* Header Content */}
       <div className="flex flex-col justify-center items-center text-center w-full pt-10 mb-10">
         <div ref={iconRef}>
           <GiBullHorns className="lg:w-auto w-full text-2xl text-start text-green-700 mb-2" />
         </div>
-        <h2
-          ref={subtitleRef}
-          className="text-xl font-bold text-[#687469] text-start mb-3"
-        >
+        <h2 ref={subtitleRef} className="text-xl font-bold text-[#687469] text-start mb-3">
           Services
         </h2>
-        <h1
-          ref={titleRef}
-          className="lg:text-5xl text-2xl min-w-[150px] font-bold text-[#334b35] text-start"
-        >
+        <h1 ref={titleRef} className="lg:text-5xl text-2xl min-w-[150px] font-bold text-[#334b35] text-start">
           What we offer
         </h1>
       </div>
 
+      {/* Cards Grid */}
       <div
         ref={cardsContainerRef}
-        className="p-5 min-h-[300px] h-auto lg:h-auto flex justify-center items-center overflow-auto lg:items-center lg:justify-center flex-col mt-14 mb-20 lg:mt-14 lg:mb-20 lg:flex-row w-full lg:w-auto gap-8 lg:px-24 max-w-[86%] mx-auto"
+        className="p-5 min-h-[300px] flex justify-center items-center overflow-auto flex-col mt-14 mb-20 lg:flex-row w-full gap-8 lg:px-24 max-w-[86%] mx-auto"
       >
         {whatWeOfferData.length > 0 ? (
           whatWeOfferData.map((item, index) => (
             <Link
-              href={item.extra_data.url}
+              href={item.extra_data.url || "/about_us#about-us"} 
               key={index}
-              ref={(el) => {cardRefs.current[index] = el}}
-              className="rounded-md relative h-[300px] lg:h-[300px] w-full group cursor-pointer transform transition-transform duration-300 hover:scale-105"
+              ref={(el) => { cardRefs.current[index] = el; }}
+              className="rounded-md relative h-[300px] w-full group cursor-pointer transform transition-transform duration-300 hover:scale-105"
             >
               <Image
                 src={item.image_url || "/placeholder.svg"}
@@ -257,23 +219,19 @@ const CardsSection: React.FC = () => {
                 fill
                 className="rounded-lg object-cover"
               />
-
-              <div className="absolute inset-0 rounded-lg group-hover:bg-black/50 transition duration-500 bg-black/20 flex justify-start items-start"></div>
+              
+              <div className="absolute inset-0 rounded-lg group-hover:bg-black/50 transition duration-500 bg-black/20"></div>
 
               <div className="absolute inset-0 lg:bottom-10 flex justify-center items-end opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="bg-green-900 text-white p-4 rounded-lg cursor-pointer transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                <div className="bg-green-900 text-white p-4 rounded-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                   Learn More
                 </div>
               </div>
 
               <div className="absolute inset-0 top-16 left-10 rounded-lg bg-opacity-50 flex justify-start items-start">
                 <div className="flex flex-col space-y-4 text-start group-hover:opacity-15 transition-opacity duration-300">
-                  <h2 className="text-white text-xl font-light italic">
-                    {item.extra_data.heading}
-                  </h2>
-                  <h2 className="text-white text-2xl lg:text-3xl font-bold">
-                    {item.name}
-                  </h2>
+                  <h2 className="text-white text-xl font-light italic">{item.extra_data.heading}</h2>
+                  <h2 className="text-white text-2xl lg:text-3xl font-bold">{item.name}</h2>
                 </div>
               </div>
             </Link>

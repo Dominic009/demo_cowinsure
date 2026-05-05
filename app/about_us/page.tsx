@@ -54,6 +54,7 @@ interface BaseCardApiResponse {
 interface BaseCategory {
   id: string;
   name: string;
+  
   description: string;
 }
 

@@ -130,9 +130,9 @@ export default function SubscriptionPlans() {
       <div className="max-w-[1500px] mx-auto px-6 lg:px-8">
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-4xl md:text-5xl font-extrabold text-[#334b35] tracking-tight mb-6">
+          <h2 className="text-4xl md:text-4xl font-extrabold text-[#334b35] tracking-tight mb-6">
             Simple, transparent{" "}
-            <span className="text-emerald-600">pricing</span>
+            <span className="text-emerald-600 text-5xl" >pricing</span>
           </h2>
           <p className="text-lg text-[#687469] leading-relaxed">
             Choose the perfect plan for your farm management needs. Scale

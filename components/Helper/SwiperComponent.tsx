@@ -8,7 +8,6 @@ import "swiper/css/effect-fade";
 import { Autoplay, EffectFade, Navigation, Pagination } from "swiper/modules";
 import Image from "next/image";
 import Link from "next/link";
-// import { HiMiniArrowLongLeft } from "react-icons/hi2";
 import { gsap } from "gsap";
 import type { Swiper as SwiperType } from "swiper";
 
@@ -62,26 +61,9 @@ const SwiperComponent = () => {
   useEffect(() => {
     if (!isLoading && sliderData.length > 0) {
       const ctx = gsap.context(() => {
-        // Initial entrance animation for stats
         gsap.fromTo(
           statsRef.current,
-          // {
-          //   y: 100,
-          //   opacity: 0,
-          // },
-          // {
-          //   y: 0,
-          //   opacity: 1,
-          //   duration: 1.5,
-          //   ease: "power2.out",
-          //   delay: 2,
-          // }
-
-          // For development purpose
-          {
-            y: 0,
-            opacity: 1,
-          },
+          { y: 0, opacity: 1 },
           {
             y: 0,
             opacity: 1,
@@ -91,21 +73,18 @@ const SwiperComponent = () => {
           }
         );
 
-        // Initialize all slides with proper starting positions
         sliderData.forEach((_, index) => {
           const titleElement = titleRefs.current[index];
           const lineElement = lineRefs.current[index];
           const buttonElement = buttonRefs.current[index];
 
           if (titleElement && lineElement && buttonElement) {
-            // Set initial states for all slides
             gsap.set(titleElement, { y: 100, opacity: 0 });
             gsap.set(lineElement, { width: 0, opacity: 0 });
             gsap.set(buttonElement, { y: 30, opacity: 0 });
           }
         });
 
-        // Animate the first slide immediately
         animateSlideContent(0);
       }, containerRef);
 
@@ -113,7 +92,6 @@ const SwiperComponent = () => {
     }
   }, [isLoading, sliderData]);
 
-  // Function to animate slide content
   const animateSlideContent = (slideIndex: number) => {
     const titleElement = titleRefs.current[slideIndex];
     const lineElement = lineRefs.current[slideIndex];
@@ -122,17 +100,11 @@ const SwiperComponent = () => {
     if (titleElement && lineElement && buttonElement) {
       const ctx = gsap.context(() => {
         const tl = gsap.timeline();
-
-        // Reset positions for this slide
-        gsap.set([titleElement, lineElement, buttonElement], {
-          opacity: 0,
-        });
-
+        gsap.set([titleElement, lineElement, buttonElement], { opacity: 0 });
         gsap.set(titleElement, { y: 100 });
         gsap.set(lineElement, { width: 0 });
         gsap.set(buttonElement, { y: 30 });
 
-        // Animate in sequence
         tl.to(titleElement, {
           y: 0,
           opacity: 1,
@@ -140,32 +112,23 @@ const SwiperComponent = () => {
           ease: "power2.out",
           delay: 0.5,
         })
-          .to(
-            lineElement,
-            {
-              width: "50%",
-              opacity: 1,
-              duration: 1.5,
-              ease: "power2.out",
-            },
-            "-=0.5"
-          )
-          .to(
-            buttonElement,
-            {
-              y: 0,
-              opacity: 1,
-              duration: 0.8,
-              ease: "back.out(1.7)",
-            },
-            "-=0.8"
-          );
+          .to(lineElement, {
+            width: "50%",
+            opacity: 1,
+            duration: 1.5,
+            ease: "power2.out",
+          }, "-=0.5")
+          .to(buttonElement, {
+            y: 0,
+            opacity: 1,
+            duration: 0.8,
+            ease: "back.out(1.7)",
+          }, "-=0.8");
       });
       return ctx;
     }
   };
 
-  // Animate slide content when slide changes
   useEffect(() => {
     if (sliderData.length > 0) {
       animateSlideContent(activeIndex);
@@ -188,53 +151,23 @@ const SwiperComponent = () => {
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-[100vh]">
-      {/* Navigation Buttons */}
-      {/* <div className="absolute right-4 top-10 lg:right-16 lg:top-10 z-40 flex gap-3 lg:flex-col">
-        <button
-          ref={nextRef}
-          className="group hover:border-white text-white p-2 lg:p-4 rounded-full border-2 border-gray-500/20 transition-all duration-300 hover:bg-white/10"
-        >
-          <HiMiniArrowLongLeft className="text-lg lg:text-xl hover:text-white text-gray-500 transition-colors duration-300" />
-        </button>
-        <button
-          ref={prevRef}
-          className="group hover:border-white text-white p-2 lg:p-4 rounded-full border-2 border-gray-500/20 transition-all duration-300 hover:bg-white/10"
-        >
-          <HiMiniArrowLongLeft className="text-lg lg:text-xl hover:text-white rotate-180 text-gray-500 transition-colors duration-300" />
-        </button>
-      </div> */}
-
-      {/* Swiper Container */}
-      <div className="relative">
+    <div ref={containerRef} className="relative w-full min-h-screen">
+      <div className="relative h-[90vh] md:h-[70vh] lg:h-[100vh]">
         <Swiper
           onSlideChange={handleSlideChange}
-          onSwiper={(swiper) => {
-            setTimeout(() => {
-              if (
-                swiper.params.navigation &&
-                typeof swiper.params.navigation !== "boolean"
-              ) {
-                swiper.params.navigation.prevEl = prevRef.current;
-                swiper.params.navigation.nextEl = nextRef.current;
-                swiper.navigation.init();
-                swiper.navigation.update();
-              }
-            });
-          }}
           effect="fade"
           fadeEffect={{ crossFade: true }}
-          speed={1000}
+          speed={1500} // Smooth transition (TC-11)
           spaceBetween={0}
           slidesPerView={1}
-          navigation={{
-            prevEl: prevRef.current,
-            nextEl: nextRef.current,
-          }}
           pagination={{ clickable: true }}
-          autoplay={{ delay: 5000, disableOnInteraction: false }}
+          autoplay={{ 
+            delay: 5000, 
+            disableOnInteraction: false, 
+            pauseOnMouseEnter: true // Hover fix (TC-11)
+          }}
           modules={[EffectFade, Navigation, Pagination, Autoplay]}
-          className="w-full h-[90vh] md:h-[70vh] lg:h-[90vh] bg-black"
+          className="w-full h-full bg-black"
         >
           {sliderData.map((slide, index) => (
             <SwiperSlide key={slide.id}>
@@ -244,32 +177,26 @@ const SwiperComponent = () => {
                   alt={slide.title}
                   fill
                   className="object-cover"
-                  quality={75}
-                  priority={index === 0}
+                  quality={90}
+                  priority={true} // Priority loading to prevent layout shift 
+                  sizes="100vw"
                 />
 
-                {/* Overlay Content */}
                 <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center text-center px-4 pb-20">
                   <p
-                    ref={(el) => {
-                      titleRefs.current[index] = el;
-                    }}
+                    ref={(el) => { titleRefs.current[index] = el; }}
                     className="text-white text-2xl md:text-4xl lg:text-5xl font-bold mb-6 max-w-4xl leading-tight"
                   >
                     {slide.title}
                   </p>
 
                   <div
-                    ref={(el) => {
-                      lineRefs.current[index] = el;
-                    }}
+                    ref={(el) => { lineRefs.current[index] = el; }}
                     className="h-1 bg-white mb-8 opacity-0"
                   />
 
                   <div
-                    ref={(el) => {
-                      buttonRefs.current[index] = el;
-                    }}
+                    ref={(el) => { buttonRefs.current[index] = el; }}
                     className="opacity-0 z-20 relative"
                   >
                     <Link
@@ -289,57 +216,31 @@ const SwiperComponent = () => {
         </Swiper>
       </div>
 
-      {/* Statistics Section - Now properly responsive */}
+      {/* Statistics Section with correct negative margin */}
       <div
         ref={statsRef}
-        className="relative mt-[-22] min-[768px]:mt-[-64] z-10 px-4 md:px-8 lg:px-20 opacity-0"
+        className="relative mt-[-40px] md:mt-[-60px] lg:mt-[-80px] z-20 px-4 md:px-8 lg:px-20"
       >
         <div className="bg-[#F6F4EC] rounded-lg shadow-lg overflow-hidden lg:max-w-[1450px] lg:h-40 mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 h-full">
-            {/* Farmers Impacted */}
             <div className="p-6 text-center border-b md:border-b-0 md:border-r border-gray-200 flex flex-col items-center justify-center">
-              <h3 className="font-normal text-lg lg:text-xl text-green-700/70 mb-2">
-                Cattle Farmers
-              </h3>
-              <p className="text-2xl lg:text-4xl text-green-950/70 font-semibold">
-                11,000+
-              </p>
-              {/* <small className="text-sm text-green-700/70">
-                MSME Farms and Farmers
-              </small> */}
+              <h3 className="font-normal text-lg lg:text-xl text-green-700/70 mb-2">Cattle Farmers</h3>
+              <p className="text-2xl lg:text-4xl text-green-950/70 font-semibold">11,000+</p>
             </div>
 
-            {/* Livestock Registered */}
             <div className="p-6 text-center border-b md:border-b-0 lg:border-r border-gray-200 flex flex-col items-center justify-center">
-              <h3 className="font-normal text-lg lg:text-xl text-green-700/70 mb-2">
-                Cattle
-              </h3>
-              <p className="text-2xl lg:text-4xl text-green-950/70 font-semibold">
-                24,500+
-              </p>
-              {/* <small className="text-sm text-green-700/70">
-                Cattle Registered
-              </small> */}
+              <h3 className="font-normal text-lg lg:text-xl text-green-700/70 mb-2">Cattle</h3>
+              <p className="text-2xl lg:text-4xl text-green-950/70 font-semibold">24,500+</p>
             </div>
 
-            {/* Fraudulent Claims */}
             <div className="p-6 text-center border-b lg:border-b-0 lg:border-r border-gray-200 flex flex-col items-center justify-center">
-              <h3 className="font-normal text-lg lg:text-xl text-green-700/70 mb-2">
-                Fraudulent Claims
-              </h3>
+              <h3 className="font-normal text-lg lg:text-xl text-green-700/70 mb-2">Fraudulent Claims</h3>
               <p className="text-2xl lg:text-4xl text-green-950/70 font-semibold">0</p>
-              {/* <small className="text-sm text-green-700/70">False Claims</small> */}
             </div>
 
-            {/* Capacity Building */}
             <div className="p-6 text-center flex flex-col items-center justify-center">
-              <h3 className="font-normal text-lg lg:text-xl text-green-700/70 mb-2">
-                Capacity Building
-              </h3>
-              <p className="text-2xl lg:text-4xl text-green-950/70 font-semibold">
-                2,000+
-              </p>
-              {/* <small className="text-sm text-green-700/70">Farmers Trained</small> */}
+              <h3 className="font-normal text-lg lg:text-xl text-green-700/70 mb-2">Capacity Building</h3>
+              <p className="text-2xl lg:text-4xl text-green-950/70 font-semibold">2,000+</p>
             </div>
           </div>
         </div>

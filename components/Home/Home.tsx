@@ -133,7 +133,7 @@ const Home = () => {
       </div>
 
       {/* contact us */}
-      <div className="py-16 bg-[#F6F4EC] ">
+      <div className="py- bg-[#F6F4EC] ">
         <ContactUs />
       </div>
 

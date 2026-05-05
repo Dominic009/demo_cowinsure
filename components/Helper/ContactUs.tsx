@@ -63,7 +63,6 @@ const ContactUs: React.FC = () => {
         },
       })
 
-      // Icon animation - falls from top with bounce
       tl.to(iconRef.current, {
         duration: 0.8,
         y: 0,
@@ -71,7 +70,6 @@ const ContactUs: React.FC = () => {
         ease: "power2.out",
       })
 
-      // Title animation - falls from top
       tl.to(
         titleRef.current,
         {
@@ -83,7 +81,6 @@ const ContactUs: React.FC = () => {
         "-=0.4",
       )
 
-      // Form container slides up
       tl.to(
         formRef.current,
         {
@@ -95,7 +92,6 @@ const ContactUs: React.FC = () => {
         "-=0.3",
       )
 
-      // Input fields animate in with stagger
       tl.to(
         inputRefs.current,
         {
@@ -108,7 +104,6 @@ const ContactUs: React.FC = () => {
         "-=0.5",
       )
 
-      // Button scales in
       tl.to(
         buttonRef.current,
         {
@@ -136,7 +131,6 @@ const ContactUs: React.FC = () => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // Button animation on submit
     if (buttonRef.current) {
       gsap.to(buttonRef.current, {
         scale: 0.95,
@@ -173,7 +167,6 @@ const ContactUs: React.FC = () => {
           description: "",
         })
 
-        // Success animation - form fields clear with animation
         gsap.to(inputRefs.current, {
           scale: 1.05,
           duration: 0.2,
@@ -204,11 +197,11 @@ const ContactUs: React.FC = () => {
         </h2>
         <section
           ref={formRef}
-          className="w-[95%] md:w-[65%] lg:w-[60%] h-auto mt-4 rounded-lg container mx-auto p-4"
+          className="w-[95%] md:w-[65%] lg:w-[60%] h-auto mt-4 rounded-lg container mx-auto p-4 border "
         >
           <div className="px-4 py-8">
-            <form onSubmit={handleSubmit} className="justify-center items-center space-y-6 text-start">
-              <div className="flex space-x-4">
+            <form onSubmit={handleSubmit} className="justify-center items-center space-y-6 text-start text-black">
+              <div className="flex space-x-4 ">
                 <div className="flex-1">
                   <input
                     ref={(el) => {
@@ -220,7 +213,7 @@ const ContactUs: React.FC = () => {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    className="mt-1 block h-[70px] lg:text-lg font-medium w-full p-4 py-2 lg:p-6 lg:py-4 rounded-xl shadow-sm focus:outline-none focus:bg-white sm:text-sm transition-all duration-300 hover:shadow-md focus:shadow-lg"
+                    className="mt-1 block h-[70px] lg:text-lg font-medium w-full p-4 py-2 lg:p-6 lg:py-4 rounded-xl shadow-sm focus:outline-none focus:bg-white sm:text-sm transition-all duration-300 hover:shadow-md focus:shadow-lg "
                     required
                   />
                 </div>
@@ -256,19 +249,31 @@ const ContactUs: React.FC = () => {
                     required
                   />
                 </div>
-                <div className="flex-1">
+                {/* Updated Mobile Number Field */}
+                <div className="flex-1 text-start">
+                  <label className="text-sm font-medium text-slate-600 block mb-1 ml-2">
+                    Mobile Number
+                  </label>
                   <input
                     ref={(el) => {
                       inputRefs.current[3] = el
                     }}
                     type="tel"
-                    placeholder="Phone Number"
                     id="phone"
                     name="phone"
                     value={formData.phone}
-                    onChange={handleChange}
-                    className="mt-1 block h-[70px] lg:text-lg font-medium w-full p-4 py-2 lg:p-6 lg:py-4 rounded-xl shadow-sm focus:outline-none focus:bg-white sm:text-sm transition-all duration-300 hover:shadow-md focus:shadow-lg"
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (/^[0-9]*$/.test(val) && val.length <= 11) {
+                        setFormData({
+                          ...formData,
+                          phone: val,
+                        })
+                      }
+                    }}
                     required
+                    placeholder="01XXXXXXXXX"
+                    className="mt-1 block h-[70px] lg:text-lg font-medium w-full p-4 py-2 lg:p-6 lg:py-4 rounded-xl shadow-sm focus:outline-none focus:bg-white sm:text-sm transition-all duration-300 hover:shadow-md focus:shadow-lg border border-slate-200"
                   />
                 </div>
               </div>

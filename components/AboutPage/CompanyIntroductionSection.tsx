@@ -10,7 +10,8 @@ const CompanyIntroductionSection = () => {
   const subtitleRef = useRef<HTMLHeadingElement>(null);
 
   return (
-    <section className="py-20 md:py-32 bg-[#F6F4EC] relative overflow-hidden">
+    // এখানে id="about-us" যোগ করা হয়েছে যাতে নেভবার থেকে এখানে আসা যায়
+    <section id="about-us" className="py-20 md:py-32 bg-[#F6F4EC] relative overflow-hidden scroll-mt-20">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="w-full h-full bg-[#F6F4EC]"></div>
@@ -18,7 +19,7 @@ const CompanyIntroductionSection = () => {
 
       <div className="max-w-[1480px] mx-auto px-4 relative z-10">
         {/* Section 1: Introduction & Company Overview */}
-        <div className="mb-32 bg-white py-16 rounded-3xl">
+        <div className="mb-32 bg-white py-16 rounded-3xl shadow-sm">
           {/* Hero Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -40,11 +41,11 @@ const CompanyIntroductionSection = () => {
               </h2>
             </motion.div>
 
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 tracking-tight">
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 tracking-tight px-4">
               Building Financial Infrastructure<br />
               <span className="text-green-700">for Rural Economies</span>
             </h1>
-            <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+            <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed px-4">
               Bridging the Worlds Most Overlooked Asset Financing Gap
             </p>
           </motion.div>
@@ -56,7 +57,7 @@ const CompanyIntroductionSection = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <div className="max-w-6xl mx-auto">
+            <div className="max-w-6xl mx-auto px-6">
               <div className="grid lg:grid-cols-2 gap-12 items-center">
                 <div>
                   <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
