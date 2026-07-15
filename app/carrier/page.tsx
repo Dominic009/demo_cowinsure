@@ -161,7 +161,10 @@ const CarrierPage: React.FC = () => {
                     </span>
                   </div>
 
-                  <p className="text-gray-600 mb-4">{job.description}</p>
+                  <div
+                    className="text-gray-600 mb-4 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_li]:mb-1 [&_strong]:text-[#334b35] [&_hr]:my-3 [&_hr]:border-gray-200"
+                    dangerouslySetInnerHTML={{ __html: job.description }}
+                  />
 
                   {job.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-6">
