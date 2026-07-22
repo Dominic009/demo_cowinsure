@@ -9,6 +9,7 @@ import "./globals.css";
 import Footer from "@/components/Helper/Footer";
 import NavBarResponsive from "@/components/Helper/NavBarResponsive";
 import LoadingProvider from "@/components/Helper/LoadingProvider";
+import FloatingIframe from "@/components/floating-iframe";
 // import LenisProvider from "@/utils/LenisProvider";
 
 const poppins = Poppins({
@@ -46,6 +47,7 @@ export default function RootLayout({
           {/* </LenisProvider> */}
         </LoadingProvider>
         <Footer />
+           <FloatingIframe />
       </body>
     </html>
   );
