@@ -1,18 +1,29 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
-import type React from "react";
 
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type React from "react";
 import Image from "next/image";
-import { GiBullHorns } from "react-icons/gi";
 import Link from "next/link";
+import { GiBullHorns } from "react-icons/gi";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import BackgroundImageLayer from "../common/BackgroundImageLayer";
+import { Bricolage_Grotesque } from "next/font/google";
 
-// Register ScrollTrigger plugin
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
+
+/* Palette (same as hero + nav)
+   pine #07140F · moss #1F4D36 · bone #EEF2E6 · tag (amber) #F2B84B
+   BONE paints this section's background AND the carved notch, so the two
+   always match. Keep it equal to the BONE constant in the hero and nav. */
+const BONE = "#EEF2E6";
+const NOTCH = 28;
+
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface ExtraData {
   url: string;
@@ -49,334 +60,275 @@ interface BaseCategoryApiResponse {
   data: BaseCategory[];
 }
 
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Concave joins for a notch in the bottom-right corner of the frame
+const fillet: React.CSSProperties = {
+  width: NOTCH,
+  height: NOTCH,
+  background: `radial-gradient(circle at 0 0, transparent ${NOTCH}px, ${BONE} ${NOTCH + 0.5}px)`,
+};
+
 const AboutUsSection: React.FC = () => {
-  const [aboutUsData, setAboutUsData] = useState<BaseCard[]>([]);
+  const [items, setItems] = useState<BaseCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const rootRef = useRef<HTMLElement>(null);
 
-  // Refs for animations
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imageRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const iconRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const subtitleRefs = useRef<(HTMLSpanElement | null)[]>([]);
-  const titleRefs = useRef<(HTMLHeadingElement | null)[]>([]);
-  const headingRefs = useRef<(HTMLParagraphElement | null)[]>([]);
-  const descriptionRefs = useRef<(HTMLParagraphElement | null)[]>([]);
-  const buttonRefs = useRef<(HTMLAnchorElement | null)[]>([]);
-
+  /* ---------- data ---------- */
   useEffect(() => {
-    const fetchBaseCategories = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-categories/`
-        );
-        const result: BaseCategoryApiResponse = await response.json();
-        if (result.status === "success") {
-          const AboutUsCategory = result.data.find(
-            (category) => category.name === "About Us - Home Section"
-          );
-          if (AboutUsCategory) {
-            fetchBaseCards(AboutUsCategory.id);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching base categories: ", error);
-        setIsLoading(false);
-      }
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    const fetchCards = async (categoryId: string) => {
+      const res = await fetch(
+        `${base}/base-category/${categoryId}/base-cards/`,
+      );
+      const result: BaseCardApiResponse = await res.json();
+      if (result.status === "success") setItems(result.data);
     };
 
-    const fetchBaseCards = async (categoryId: string) => {
+    const load = async () => {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-category/${categoryId}/base-cards/`
-        );
-        const result: BaseCardApiResponse = await response.json();
+        const res = await fetch(`${base}/base-categories/`);
+        const result: BaseCategoryApiResponse = await res.json();
         if (result.status === "success") {
-          setAboutUsData(result.data);
+          const category = result.data.find(
+            (c) => c.name === "About Us - Home Section",
+          );
+          if (category) await fetchCards(category.id);
         }
       } catch (error) {
-        console.error("Error fetching base cards: ", error);
+        console.error("Error fetching about us data:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBaseCategories();
+    load();
   }, []);
 
-  // GSAP animations
-  useEffect(() => {
-    if (!isLoading && aboutUsData.length > 0) {
-      const ctx = gsap.context(() => {
-        aboutUsData.forEach((_, index) => {
-          const imageElement = imageRefs.current[index];
-          const iconElement = iconRefs.current[index];
-          const subtitleElement = subtitleRefs.current[index];
-          const titleElement = titleRefs.current[index];
-          const headingElement = headingRefs.current[index];
-          const descriptionElement = descriptionRefs.current[index];
-          const buttonElement = buttonRefs.current[index];
+  /* ---------- scroll sequence: frame opens, headline rises, copy settles ---------- */
+  useIsoLayoutEffect(() => {
+    if (isLoading || items.length === 0 || prefersReducedMotion()) return;
 
-          if (
-            imageElement &&
-            iconElement &&
-            subtitleElement &&
-            titleElement &&
-            headingElement &&
-            descriptionElement &&
-            buttonElement
-          ) {
-            // Set initial states
-            // Image comes from left
-            gsap.set(imageElement, {
-              x: -100,
-              opacity: 0,
-            });
+    const ctx = gsap.context(() => {
+      rootRef.current
+        ?.querySelectorAll<HTMLElement>("[data-about-item]")
+        .forEach((item) => {
+          const q = gsap.utils.selector(item);
 
-            // Text elements come from top
-            gsap.set(
-              [
-                iconElement,
-                subtitleElement,
-                titleElement,
-                headingElement,
-                descriptionElement,
-                buttonElement,
-              ],
-              {
-                y: -50,
-                opacity: 0,
-              }
-            );
-
-            // Create timeline with scroll trigger
-            const tl = gsap.timeline({
+          // Parallax: the photo drifts slightly inside its frame
+          gsap.fromTo(
+            q("[data-parallax]"),
+            { yPercent: -5 },
+            {
+              yPercent: 5,
+              ease: "none",
               scrollTrigger: {
-                trigger: imageElement.closest(".about-section-item"),
-                start: "top 80%",
-                end: "bottom 20%",
-                toggleActions: "play none none reverse",
-                // markers: true, // Uncomment for debugging
+                trigger: item,
+                start: "top bottom",
+                end: "bottom top",
+                scrub: true,
               },
-            });
+            },
+          );
 
-            // Image animation - slides from left
-            tl.to(imageElement, {
-              duration: 1.25,
-              x: 0,
-              opacity: 1,
-              ease: "power2.out",
-            });
+          // Entrance plays once; no replay on scroll-up
+          const tl = gsap.timeline({
+            scrollTrigger: { trigger: item, start: "top 75%", once: true },
+          });
 
-            // Icon animation - falls from top
-            tl.to(
-              iconElement,
+          tl.fromTo(
+            q("[data-frame]"),
+            { clipPath: "inset(12% 14% 12% 14% round 56px)" },
+            {
+              clipPath: "inset(0% 0% 0% 0% round 28px)",
+              duration: 1.3,
+              ease: "expo.inOut",
+            },
+          )
+            .fromTo(
+              q("[data-word]"),
+              { yPercent: 115 },
+              { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.06 },
+              "-=0.7",
+            )
+            .from(
+              q("[data-fade]"),
               {
-                duration: 0.75,
-                y: 0,
-                opacity: 1,
-                ease: "power2.out",
+                y: 20,
+                opacity: 0,
+                duration: 0.8,
+                ease: "power3.out",
+                stagger: 0.1,
               },
-              "-=0.8"
+              "-=0.6",
+            )
+            .from(
+              q("[data-cta]"),
+              { scale: 0.85, opacity: 0, duration: 0.6, ease: "back.out(1.6)" },
+              "-=0.5",
             );
-
-            // Subtitle animation - falls from top
-            tl.to(
-              subtitleElement,
-              {
-                duration: 0.75,
-                y: 0,
-                opacity: 1,
-                ease: "power2.out",
-              },
-              "-=0.6"
-            );
-
-            // Title animation - falls from top
-            tl.to(
-              titleElement,
-              {
-                duration: 0.75,
-                y: 0,
-                opacity: 1,
-                ease: "power2.out",
-              },
-              "-=0.6"
-            );
-
-            // Heading animation - falls from top
-            tl.to(
-              headingElement,
-              {
-                duration: 0.75,
-                y: 0,
-                opacity: 1,
-                ease: "power2.out",
-              },
-              "-=0.6"
-            );
-
-            // Description animation - falls from top
-            tl.to(
-              descriptionElement,
-              {
-                duration: 0.75,
-                y: 0,
-                opacity: 1,
-                ease: "power2.out",
-              },
-              "-=0.6"
-            );
-
-            // Button animation - falls from top
-            tl.to(
-              buttonElement,
-              {
-                duration: 0.75,
-                y: 0,
-                opacity: 1,
-                ease: "back.out(1.7)",
-              },
-              "-=0.4"
-            );
-
-            // Add hover animation for image
-            const imageInner = imageElement.querySelector(".image-inner");
-            if (imageInner) {
-              imageElement.addEventListener("mouseenter", () => {
-                gsap.to(imageInner, {
-                  scale: 1.05,
-                  duration: 0.3,
-                  ease: "power2.out",
-                });
-              });
-
-              imageElement.addEventListener("mouseleave", () => {
-                gsap.to(imageInner, {
-                  scale: 1,
-                  duration: 0.8,
-                  ease: "power2.out",
-                });
-              });
-            }
-          }
         });
-      }, containerRef);
+    }, rootRef);
 
-      return () => ctx.revert();
-    }
-  }, [isLoading, aboutUsData]);
+    return () => ctx.revert();
+  }, [isLoading, items]);
 
+  /* ---------- states ---------- */
   if (isLoading) {
     return (
-      <div className="min-h-[600px] min-w-[90%] relative flex items-center justify-center">
-        <div className="text-center">
-          <BackgroundImageLayer imageUrl="/village2.png" opacity={0.08} />
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading about us...</p>
+      <section
+        aria-busy="true"
+        className="px-5 py-20 md:px-10 lg:px-16 lg:py-28"
+        style={{ background: BONE }}
+      >
+        <div className="mx-auto grid max-w-[1450px] animate-pulse gap-10 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
+          <div className="h-[460px] rounded-[28px] bg-[#1F4D36]/10 lg:h-[620px]" />
+          <div className="flex flex-col justify-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-[#1F4D36]/10" />
+            <div className="h-12 w-3/4 rounded-lg bg-[#1F4D36]/10" />
+            <div className="h-6 w-full rounded-lg bg-[#1F4D36]/10" />
+            <div className="h-6 w-5/6 rounded-lg bg-[#1F4D36]/10" />
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
+  if (items.length === 0) return null;
+
   return (
-    <div ref={containerRef} className="min-h-[600px] relative">
-      <BackgroundImageLayer imageUrl="/village2.png" opacity={0.08} />
-      {aboutUsData.map((item, index) => (
-        <div
-          key={index}
-          className="about-section-item flex flex-col lg:flex-row lg:justify-around md:flex-col w-full lg:pt-8 mt-[400px] md:mt-0 lg:mt-8"
-        >
-          <div
-            ref={(el) => {
-              imageRefs.current[index] = el;
-            }}
-            className="flex-1 w-full lg:w-1/2 flex justify-center lg:justify-center items-center relative"
+    <section
+      ref={rootRef}
+      aria-label="About us"
+      className={`${display.className} px-5 py-20 text-[#07140F] md:px-10 lg:px-16 lg:py-28`}
+      style={{ background: BONE }}
+    >
+      <div className="mx-auto flex flex-col gap-24 lg:gap-32">
+        {items.map((item) => (
+          <article
+            key={item.id}
+            data-about-item
+            className="grid items-center gap-10 lg:grid-cols-[1.05fr_1fr] lg:gap-16"
           >
-            <div className="relative px-10">
-              <div className="relative z-30 h-[300px] w-[300px] lg:h-[500px] lg:w-[500px] overflow-hidden border-gray-300 rounded-[5px] group">
-                <div className="image-inner w-full h-full">
-                  <Image
-                    src={item.image_url || "/placeholder.svg"}
-                    alt={item.name}
-                    height={500}
-                    width={500}
-                    className="w-full h-full rounded-md object-cover"
-                    unoptimized
-                    priority
-                  />
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="absolute w-0 h-full bg-white bg-opacity-20 transform group-hover:w-full transition-all duration-500 ease-in-out"></div>
-                </div>
+            {/* ---------- Image frame with the CTA notch ---------- */}
+            <div
+              data-frame
+              className="group relative h-[460px] overflow-hidden rounded-[28px] bg-[#1F4D36]/15 sm:h-[560px] lg:h-[clamp(520px,78svh,700px)]"
+            >
+              <div
+                data-parallax
+                className="absolute inset-x-0 -top-[8%] h-[116%]"
+              >
+                <Image
+                  src={"/homecover1.jpg"}
+                  alt={item.name}
+                  fill
+                  sizes="(min-width: 1024px) 55vw, 100vw"
+                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  unoptimized
+                />
+                <div className="absolute inset-0 z-10 bg-black/20" />
+              </div>
+
+              {/* Notch: bone panel carved into the bottom-right corner */}
+              <div
+                className="absolute bottom-0 right-0 rounded-tl-[28px] p-3 lg:p-4"
+                style={{ background: BONE }}
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute bottom-0 right-full"
+                  style={fillet}
+                />
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute bottom-full right-0"
+                  style={fillet}
+                />
+
+                <Link
+                  data-cta
+                  href="/about_us_section"
+                  scroll
+                  className="group/cta inline-flex items-center gap-3 rounded-full bg-[#07140F] py-1.5 pl-6 pr-1.5 text-base font-medium text-[#EEF2E6] transition-colors duration-300 hover:bg-[#1F4D36] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F2B84B]"
+                >
+                  Learn more
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F] transition-transform duration-300 group-hover/cta:translate-x-1">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <path
+                        d="M3 8h10m0 0L9 4m4 4-4 4"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </Link>
               </div>
             </div>
-          </div>
 
-          <div className="pl-2 pr-2 flex-1 w-full lg:w-1/2 text-start">
-            <div
-              ref={(el) => {
-                iconRefs.current[index] = el;
-              }}
-            >
-              <GiBullHorns className="w-auto text-3xl text-green-700 mb-3 pl-2 pr-2" />
-            </div>
-
-            <span
-              ref={(el) => {
-                subtitleRefs.current[index] = el;
-              }}
-              className="pl-2 pr-2 text-sm text-[#687469] uppercase font-semibold"
-            >
-              get to know about us
-            </span>
-
-            <h2
-              ref={(el) => {
-                titleRefs.current[index] = el;
-              }}
-              className="text-4xl lg:text-5xl font-bold text-[#334b35] mt-2 max-w- pl-2 pr-2 leading-8"
-            >
-              {item.name}
-            </h2>
-
-            <p
-              ref={(el) => {
-                headingRefs.current[index] = el;
-              }}
-              className="mt-5 pl-2 pr-2 text-xl text-[#687469]"
-            >
-              {item.extra_data.heading}
-            </p>
-
-            <p
-              ref={(el) => {
-                descriptionRefs.current[index] = el;
-              }}
-              className="space-y-3 mb-8 pt-5 pl-2 pr-2 text-[18px] text-[#334b35] tracking-normal"
-            >
-              {item.extra_data.description}
-            </p>
-
-            <div className="flex items-center pl-2 pr-2">
-              <Link
-                ref={(el) => {
-                  buttonRefs.current[index] = el;
-                }}
-                // href="/about_us#about"
-                href="/about_us_section"
-                scroll={true}
-                className="relative text-center p-3 lg:w-[150px] lg:h-[50px] bg-green-300 text-green-800 font-semibold rounded-md overflow-hidden group cursor-pointer flex items-center justify-center"
-              >
-                <span className="relative z-10 group-hover:text-white transition-colors duration-300">
-                  Learn more
+            {/* ---------- Copy ---------- */}
+            <div className="lg:pr-6">
+              <div data-fade className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+                  <GiBullHorns className="text-xl" aria-hidden />
                 </span>
-                <div className="absolute inset-0 bg-green-800 transform -translate-x-[-145px] group-hover:translate-x-0 transition-transform duration-300 ease-in-out"></div>
-              </Link>
+                <span className="text-base font-medium text-[#1F4D36]">
+                  About us
+                </span>
+              </div>
+
+              {/* Main heading */}
+              <h2 className="mt-6 text-[clamp(2.25rem,4.6vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.03em] text-left">
+                {item.name.split(" ").map((word, i) => (
+                  <span
+                    key={i}
+                    className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom"
+                  >
+                    <span
+                      data-word
+                      className="inline-block will-change-transform"
+                    >
+                      {word}
+                    </span>
+                  </span>
+                ))}
+              </h2>
+
+              {/* Secondary heading */}
+              {item.extra_data?.heading && (
+                <p
+                  data-fade
+                  className="mt-6 max-w-[34ch] text-xl font-medium leading-snug text-[#1F4D36] lg:text-2xl text-left"
+                >
+                  {item.extra_data.heading}
+                </p>
+              )}
+
+              {/* Description */}
+              {item.extra_data?.description && (
+                <p
+                  data-fade
+                  className="mt-5 max-w-[58ch] whitespace-pre-line text-base leading-loose tracking-wide text-[#07140F]/75 lg:text-lg text-left"
+                >
+                  {item.extra_data.description}
+                </p>
+              )}
             </div>
-          </div>
-        </div>
-      ))}
-    </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 };
 

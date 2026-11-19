@@ -1,17 +1,28 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type React from "react";
-import { GiBullHorns } from "react-icons/gi";
 import Image from "next/image";
 import Link from "next/link";
+import { GiBullHorns } from "react-icons/gi";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import BackgroundImageLayer from "../common/BackgroundImageLayer";
+import { Bricolage_Grotesque } from "next/font/google";
 
-// Register ScrollTrigger plugin
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
+
+/* Palette (same as the rest of the site)
+   pine #07140F · moss #1F4D36 · bone #EEF2E6 · tag (amber) #F2B84B
+   BONE is the section background and the colour of the carved notch. */
+const BONE = "#EEF2E6";
+const NOTCH = 24;
+
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface ExtraData {
   url: string;
@@ -47,247 +58,221 @@ interface BaseCategoryApiResponse {
   data: BaseCategory[];
 }
 
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Concave joins for the notch in each card's bottom-right corner
+const fillet: React.CSSProperties = {
+  width: NOTCH,
+  height: NOTCH,
+  background: `radial-gradient(circle at 0 0, transparent ${NOTCH}px, ${BONE} ${NOTCH + 0.5}px)`,
+};
+
 const HomeInsuranceSection: React.FC = () => {
-  const [insuranceSection, setInsuranceSection] = useState<BaseCard[]>([]);
+  const [products, setProducts] = useState<BaseCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const rootRef = useRef<HTMLElement>(null);
 
-  // Refs for GSAP animations
-  const containerRef = useRef<HTMLElement>(null);
-  const iconRef = useRef<HTMLDivElement>(null);
-  const subtitleRef = useRef<HTMLHeadingElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const cardsContainerRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-
+  /* ---------- data ---------- */
   useEffect(() => {
-    const fetchBaseCategories = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-categories/`
-        );
-        const result: BaseCategoryApiResponse = await response.json();
-        if (result.status === "success") {
-          const insuranceSectionCategory = result.data.find(
-            (category) => category.name === "Insurance Preview Section"
-          );
-          if (insuranceSectionCategory) {
-            await fetchBaseCards(insuranceSectionCategory.id);
-          } else {
-            setIsLoading(false);
-          }
-        } else {
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Error fetching base categories: ", error);
-        setIsLoading(false);
-      }
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    const fetchCards = async (categoryId: string) => {
+      const res = await fetch(
+        `${base}/base-category/${categoryId}/base-cards/`,
+      );
+      const result: BaseCardApiResponse = await res.json();
+      if (result.status === "success") setProducts(result.data);
     };
 
-    const fetchBaseCards = async (categoryId: string) => {
+    const load = async () => {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-category/${categoryId}/base-cards/`
-        );
-        const result: BaseCardApiResponse = await response.json();
+        const res = await fetch(`${base}/base-categories/`);
+        const result: BaseCategoryApiResponse = await res.json();
         if (result.status === "success") {
-          setInsuranceSection(result.data);
+          const category = result.data.find(
+            (c) => c.name === "Insurance Preview Section",
+          );
+          if (category) await fetchCards(category.id);
         }
       } catch (error) {
-        console.error("Error fetching base cards: ", error);
+        console.error("Error fetching insurance section:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBaseCategories();
+    load();
   }, []);
 
-  // GSAP ScrollTrigger animations
-  useEffect(() => {
-    if (!isLoading && insuranceSection.length > 0) {
-      const ctx = gsap.context(() => {
-        // Set initial states
-        // Header elements (icon, subtitle, title) start from top (-100px) and invisible
-        gsap.set([iconRef.current, subtitleRef.current, titleRef.current], {
-          y: -100,
-          opacity: 0,
-        });
+  /* ---------- one scroll moment: headline rises, cards wipe in from the left (plays once) ---------- */
+  useIsoLayoutEffect(() => {
+    if (isLoading || products.length === 0 || prefersReducedMotion()) return;
 
-        // Cards container starts from left (-100px) and invisible
-        gsap.set(cardsContainerRef.current, {
-          x: -100,
-          opacity: 0,
-        });
-
-        // Individual cards start invisible and scaled down
-        gsap.set(cardRefs.current, {
-          opacity: 0,
-          scale: 0.8,
-          y: 50,
-        });
-
-        // Create timeline for sequential animations
-        const tl = gsap.timeline({
+    const ctx = gsap.context(() => {
+      gsap
+        .timeline({
           scrollTrigger: {
-            trigger: containerRef.current,
-            start: "top 80%",
-            end: "bottom 20%",
-            toggleActions: "play none none reverse",
-            // markers: true,
+            trigger: rootRef.current,
+            start: "top 70%",
+            once: true,
           },
-        });
-
-        // Icon animation - falls from top
-        tl.to(iconRef.current, {
-          duration: 0.35,
-          y: 0,
-          opacity: 1,
-          ease: "power2.out",
-        });
-
-        // Subtitle animation - falls from top
-        tl.to(
-          subtitleRef.current,
+        })
+        .from("[data-fade]", {
+          y: 16,
+          opacity: 0,
+          duration: 0.7,
+          ease: "power3.out",
+        })
+        .fromTo(
+          "[data-word]",
+          { yPercent: 115 },
+          { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.05 },
+          "-=0.4",
+        )
+        .fromTo(
+          "[data-card]",
+          { clipPath: "inset(0% 100% 0% 0% round 28px)" },
           {
-            duration: 0.35,
-            delay: 0.35,
-            y: 0,
-            opacity: 1,
-            ease: "power2.out",
+            clipPath: "inset(0% 0% 0% 0% round 28px)",
+            duration: 1.1,
+            ease: "expo.inOut",
+            stagger: 0.14,
           },
-          "-=0.5"
+          "-=0.6",
         );
+    }, rootRef);
 
-        // Title animation - falls from top
-        tl.to(
-          titleRef.current,
-          {
-            duration: 0.35,
-            delay: 0.35,
-            y: 0,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.5"
-        );
+    return () => ctx.revert();
+  }, [isLoading, products]);
 
-        // Cards container animation - slides from left
-        tl.to(
-          cardsContainerRef.current,
-          {
-            duration: 0.5,
-            x: 0,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.3"
-        );
-
-        // Individual cards animation - staggered appearance
-        tl.to(
-          cardRefs.current,
-          {
-            duration: 0.25,
-            opacity: 1,
-            scale: 1,
-            y: 0,
-            ease: "back.out(1.7)",
-            stagger: {
-              amount: 0.5, // Total time to stagger all cards
-              from: "start", // Start from first card
-            },
-          },
-          "-=0.5"
-        );
-      }, containerRef);
-
-      return () => ctx.revert();
-    }
-  }, [isLoading, insuranceSection]);
-
+  /* ---------- states ---------- */
   if (isLoading) {
     return (
-      <section className="relative min-h-[600px] pt-[40vh] pb-[35vh] h-auto lg:h-auto flex flex-col lg:flex-col lg:justify-start lg:items-center items-center justify-center bg-white">
-        <BackgroundImageLayer imageUrl="/insuranceBG.png" size="70%" />
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading insurance options...</p>
+      <section
+        aria-busy="true"
+        className="px-5 py-20 md:px-10 lg:px-16 lg:py-28"
+        style={{ background: BONE }}
+      >
+        <div className="mx-auto max-w-[1450px] animate-pulse">
+          <div className="h-10 w-64 rounded-full bg-[#1F4D36]/10" />
+          <div className="mt-6 h-16 w-full max-w-3xl rounded-lg bg-[#1F4D36]/10" />
+          <div className="mt-14 grid gap-4 md:grid-cols-3">
+            {[0, 1, 2].map((n) => (
+              <div
+                key={n}
+                className="h-[420px] rounded-[28px] bg-[#1F4D36]/10 lg:h-[520px]"
+              />
+            ))}
+          </div>
         </div>
       </section>
     );
   }
 
+  if (products.length === 0) return null;
+
   return (
     <section
-      ref={containerRef}
-      className="relative pt-[10vh] pb-[10vh] h-auto lg:h-screen flex flex-col lg:flex-col lg:items-center items-center justify-center bg-white"
+      ref={rootRef}
+      aria-label="Digital insurance solutions"
+      className={`${display.className} px-5 py-20 text-[#07140F] md:px-10 lg:px-16 lg:py-28`}
+      style={{ background: BONE }}
     >
-      <BackgroundImageLayer imageUrl="/insuranceBG.png" size="70%" />
-      <div className="max-w-4xl text-center">
-        <div ref={iconRef}>
-          <GiBullHorns className="w-full lg:text-3xl text-xl text-center text-green-700 mb-2" />
+      <div className="mx-auto max-w-[1450px]">
+        {/* ---------- Header ---------- */}
+        <div data-fade className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+            <GiBullHorns className="text-xl" aria-hidden />
+          </span>
+          <span className="text-base font-medium text-[#1F4D36]">
+            Digital insurance solutions
+          </span>
         </div>
 
-        <div>
-          <h2
-            ref={subtitleRef}
-            className="text-sm lg:text-xl font-bold text-[#687469] mb-2"
-          >
-            Digital Insurance Solutions
-          </h2>
-          <h1
-            ref={titleRef}
-            className="lg:text-5xl text-3xl font-bold text-[#334b35]"
-          >
-            Simply compare, order, and get covered
-          </h1>
-        </div>
-      </div>
+        <h2 className="mt-6 max-w-4xl text-[clamp(2.25rem,5vw,4.5rem)] font-bold leading-[1.04] tracking-[-0.03em] text-left">
+          {"Simply compare, order, and get covered"
+            .split(" ")
+            .map((word, i) => (
+              <span
+                key={i}
+                className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom"
+              >
+                <span data-word className="inline-block will-change-transform">
+                  {word}
+                </span>
+              </span>
+            ))}
+        </h2>
 
-      <div
-        ref={cardsContainerRef}
-        className="mt-10 min-w-[76%] h-auto mx-auto flex flex-col gap-4 md:flex-row lg:flex-row items-center justify-center mb-5 "
-      >
-        {insuranceSection.map((item, index) => (
-          <div
-            key={index}
-            ref={(el) => {
-              cardRefs.current[index] = el;
-            }}
-            className="relative w-full flex-col h-auto justify-center items-center group bg-gray-800 rounded-lg transform transition-transform duration-300 hover:scale-105"
-          >
-            <div className="relative h-[300px] rounded-lg bg-black overflow-hidden">
-              <div className="absolute h-auto rounded-lg inset-0 bg-contain left-0 group-hover:-left-5 transition-all duration-700">
-                <Image
-                  src={item.image_url || "/placeholder.svg"}
-                  alt={item.name}
-                  fill
-                  className="rounded-lg object-cover object-center"
-                  priority
-                />
-                <div className="absolute rounded-lg bg-green-300 bg-opacity-20 top-[-100%] z-30 right-0 w-full h-full group-hover:top-0 transition-all duration-700 ease-in-out overflow-hidden"></div>
-              </div>
-            </div>
-
+        {/* ---------- Products ---------- */}
+        <div className="mt-14 grid grid-cols-[repeat(auto-fit,minmax(min(100%,290px),1fr))] gap-4 lg:mt-20 lg:gap-5">
+          {products.map((item) => (
             <Link
-              href={item.extra_data.url}
-              className="absolute bottom-0 left-0 right-0 z-50 mx-5 overflow-hidden group-hover:overflow-visible"
+              key={item.id}
+              data-card
+              href={item.extra_data?.url || "#"}
+              className="group relative block h-[420px] overflow-hidden rounded-[28px] bg-[#1F4D36]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1F4D36] lg:h-[520px]"
             >
-              <div className="relative [transform:rotateX(120deg)] z-20 flex flex-col h-[80px] justify-center items-center rounded-t-lg text-2xl font-bold text-white opacity-0 group-hover:opacity-100 group-hover:[transform:rotateX(0deg)] transition-all duration-700">
-                <div className="w-full flex flex-col justify-center bg-green-800 items-center h-full rounded-tr-lg">
-                  <div className="text-center">{item.name}</div>
-                </div>
+              <Image
+                src={item.image_url || "/placeholder.svg"}
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                className="object-cover object-center transition-transform duration-[1200ms] ease-out group-hover:scale-105 motion-reduce:transition-none"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#07140F]/85 via-[#07140F]/15 to-[#07140F]/25" />
 
-                <div className="absolute left-0 top-[-32px] rounded-t-md">
-                  <div className="bg-yellow-600 text-xs p-2 text-center text-black rounded-t-md">
-                    {item.extra_data.type}
-                  </div>
-                </div>
+              {/* Product type */}
+              {item.extra_data?.type && (
+                <span className="absolute left-5 top-5 rounded-full border border-white/25 bg-[#07140F]/40 px-4 py-1.5 text-sm font-medium text-[#EEF2E6] backdrop-blur-md">
+                  {item.extra_data.type}
+                </span>
+              )}
+
+              {/* Name: always visible, sits above the notch row */}
+              <h3 className="absolute inset-x-0 bottom-0 px-6 pb-[88px] text-2xl font-bold leading-tight tracking-[-0.02em] text-[#EEF2E6] lg:text-3xl">
+                {item.name}
+              </h3>
+
+              {/* Notch: the arrow grows into a "Learn more" pill on hover / focus (always open on touch) */}
+              <div
+                aria-hidden
+                className="absolute bottom-0 right-0 rounded-tl-[24px] p-2.5"
+                style={{ background: BONE }}
+              >
+                <span
+                  className="pointer-events-none absolute bottom-0 right-full"
+                  style={fillet}
+                />
+                <span
+                  className="pointer-events-none absolute bottom-full right-0"
+                  style={fillet}
+                />
+
+                <span className="grid grid-cols-[0fr_auto] items-center rounded-full bg-[#07140F] text-[#EEF2E6] transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:grid-cols-[1fr_auto] group-focus-visible:grid-cols-[1fr_auto] motion-reduce:transition-none [@media(hover:none)]:grid-cols-[1fr_auto]">
+                  <span className="min-w-0 overflow-hidden">
+                    <span className="block whitespace-nowrap pl-5 pr-3 text-[15px] font-medium">
+                      Learn more
+                    </span>
+                  </span>
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M3 8h10m0 0L9 4m4 4-4 4"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </span>
               </div>
             </Link>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );

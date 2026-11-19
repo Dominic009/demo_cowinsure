@@ -1,17 +1,30 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { GiBullHorns } from "react-icons/gi";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import BackgroundImageLayer from "../common/BackgroundImageLayer";
+import { Bricolage_Grotesque } from "next/font/google";
 
-// Register GSAP ScrollTrigger plugin for client-side usage
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
+
+/* Palette (same as hero, nav, about)
+   pine #07140F · moss #1F4D36 · bone #EEF2E6 · tag (amber) #F2B84B
+   BONE = page background around the panel (match the other files).
+   PINE = the panel colour AND the carved notches inside the cards. */
+const BONE = "#EEF2E6";
+const PINE = "#07140F";
+const NOTCH = 24;
+
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface ExtraData {
   url: string;
@@ -47,200 +60,260 @@ interface BaseCategoryApiResponse {
   data: BaseCategory[];
 }
 
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Concave joins for a notch in the bottom-right corner of a card
+const fillet: React.CSSProperties = {
+  width: NOTCH,
+  height: NOTCH,
+  background: `radial-gradient(circle at 0 0, transparent ${NOTCH}px, ${PINE} ${NOTCH + 0.5}px)`,
+};
+
 const CardsSection: React.FC = () => {
-  const [whatWeOfferData, setWhatWeOfferData] = useState<BaseCard[]>([]);
+  const [services, setServices] = useState<BaseCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [active, setActive] = useState(0); // which card is expanded (desktop)
+  const rootRef = useRef<HTMLElement>(null);
 
-  // Animation Refs
-  const containerRef = useRef<HTMLDivElement>(null);
-  const iconRef = useRef<HTMLDivElement>(null);
-  const subtitleRef = useRef<HTMLHeadingElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const cardsContainerRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLAnchorElement | null)[]>([]);
-
+  /* ---------- data ---------- */
   useEffect(() => {
-    const fetchBaseCategories = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-categories/`
-        );
-        const result: BaseCategoryApiResponse = await response.json();
-        if (result.status === "success") {
-          const whatWeOfferCategory = result.data.find(
-            (category) => category.name === "What We Offer - Home Section"
-          );
-          if (whatWeOfferCategory) {
-            await fetchBaseCards(whatWeOfferCategory.id);
-          } else {
-            setIsLoading(false);
-          }
-        } else {
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Error fetching base categories:", error);
-        setIsLoading(false);
-      }
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    const fetchCards = async (categoryId: string) => {
+      const res = await fetch(
+        `${base}/base-category/${categoryId}/base-cards/`,
+      );
+      const result: BaseCardApiResponse = await res.json();
+      if (result.status === "success") setServices(result.data);
     };
 
-    const fetchBaseCards = async (categoryId: string) => {
+    const load = async () => {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-category/${categoryId}/base-cards/`
-        );
-        const result: BaseCardApiResponse = await response.json();
+        const res = await fetch(`${base}/base-categories/`);
+        const result: BaseCategoryApiResponse = await res.json();
         if (result.status === "success") {
-          setWhatWeOfferData(result.data);
+          const category = result.data.find(
+            (c) => c.name === "What We Offer - Home Section",
+          );
+          if (category) await fetchCards(category.id);
         }
       } catch (error) {
-        console.error("Error fetching base cards:", error);
+        console.error("Error fetching services:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBaseCategories();
+    load();
   }, []);
 
-  // GSAP Animation Logic
-  useEffect(() => {
-    if (!isLoading && whatWeOfferData.length > 0) {
-      const ctx = gsap.context(() => {
-        // Initial states: Hidden and offset
-        gsap.set([iconRef.current, subtitleRef.current, titleRef.current], {
-          y: -100,
-          opacity: 0,
-        });
+  /* ---------- one scroll moment: headline rises, cards unfold in turn (plays once) ---------- */
+  useIsoLayoutEffect(() => {
+    if (isLoading || services.length === 0 || prefersReducedMotion()) return;
 
-        gsap.set(cardsContainerRef.current, {
-          x: -100,
-          opacity: 0,
-        });
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: rootRef.current,
+          start: "top 70%",
+          once: true,
+        },
+      });
 
-        gsap.set(cardRefs.current, {
-          opacity: 0,
-          scale: 0.8,
-          y: 50,
-        });
-
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: containerRef.current,
-            start: "top 80%",
-            end: "bottom 20%",
-            toggleActions: "play none none reverse",
+      tl.from("[data-fade]", {
+        y: 16,
+        opacity: 0,
+        duration: 0.7,
+        ease: "power3.out",
+      })
+        .fromTo(
+          "[data-word]",
+          { yPercent: 115 },
+          { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.06 },
+          "-=0.4",
+        )
+        .fromTo(
+          "[data-card]",
+          { clipPath: "inset(100% 0% 0% 0% round 28px)" },
+          {
+            clipPath: "inset(0% 0% 0% 0% round 28px)",
+            duration: 1.1,
+            ease: "expo.inOut",
+            stagger: 0.12,
           },
-        });
+          "-=0.6",
+        );
+    }, rootRef);
 
-        tl.to(iconRef.current, {
-          duration: 0.35,
-          y: 0,
-          opacity: 1,
-          ease: "power2.out",
-        })
-        .to(subtitleRef.current, {
-          duration: 0.35,
-          y: 0,
-          opacity: 1,
-          ease: "power2.out",
-        }, "-=0.2")
-        .to(titleRef.current, {
-          duration: 0.35,
-          y: 0,
-          opacity: 1,
-          ease: "power2.out",
-        }, "-=0.2")
-        .to(cardsContainerRef.current, {
-          duration: 0.5,
-          x: 0,
-          opacity: 1,
-          ease: "power2.out",
-        }, "-=0.3")
-        .to(cardRefs.current, {
-          duration: 0.25,
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          ease: "back.out(1.7)",
-          stagger: 0.1
-        }, "-=0.3");
-      }, containerRef);
+    return () => ctx.revert();
+  }, [isLoading, services]);
 
-      return () => ctx.revert();
-    }
-  }, [isLoading, whatWeOfferData]);
-
+  /* ---------- states ---------- */
   if (isLoading) {
     return (
-      <div className="min-h-[700px] relative flex items-center justify-center">
-        <BackgroundImageLayer imageUrl='/village3.png' opacity={0.1} size="80%"/>
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading services...</p>
+      <section
+        aria-busy="true"
+        className="p-2 sm:p-3 lg:p-4"
+        style={{ background: BONE }}
+      >
+        <div
+          className="animate-pulse rounded-[28px] px-5 py-16 md:px-10 lg:px-16 lg:py-24"
+          style={{ background: PINE }}
+        >
+          <div className="mx-auto max-w-[1450px]">
+            <div className="h-12 w-72 rounded-lg bg-white/10" />
+            <div className="mt-12 grid gap-4 lg:grid-cols-3">
+              {[0, 1, 2].map((n) => (
+                <div
+                  key={n}
+                  className="h-[340px] rounded-[28px] bg-white/10 lg:h-[520px]"
+                />
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
+  if (services.length === 0) return null;
+
   return (
-    <div ref={containerRef} className="relative py-10">
-      <BackgroundImageLayer imageUrl='/village3.png' opacity={0.1} size="80%"/>
-      
-      {/* Header Content */}
-      <div className="flex flex-col justify-center items-center text-center w-full pt-10 mb-10">
-        <div ref={iconRef}>
-          <GiBullHorns className="lg:w-auto w-full text-2xl text-start text-green-700 mb-2" />
-        </div>
-        <h2 ref={subtitleRef} className="text-xl font-bold text-[#687469] text-start mb-3">
-          Services
-        </h2>
-        <h1 ref={titleRef} className="lg:text-5xl text-2xl min-w-[150px] font-bold text-[#334b35] text-start">
-          What we offer
-        </h1>
-      </div>
-
-      {/* Cards Grid */}
+    <section
+      ref={rootRef}
+      aria-label="What we offer"
+      className={`${display.className} p-2 sm:p-3 lg:p-4`}
+      // style={{ background: BONE }}
+    >
       <div
-        ref={cardsContainerRef}
-        className="p-5 min-h-[300px] flex justify-center items-center overflow-auto flex-col mt-14 mb-20 lg:flex-row w-full gap-8 lg:px-24 max-w-[86%] mx-auto"
+        className="rounded-[28px] px-5 py-16 text-[#EEF2E6] md:px-10 lg:px-16 lg:py-24"
+        style={{ background: PINE }}
       >
-        {whatWeOfferData.length > 0 ? (
-          whatWeOfferData.map((item, index) => (
-            <Link
-              href={item.extra_data.url || "/about_us#about-us"} 
-              key={index}
-              ref={(el) => { cardRefs.current[index] = el; }}
-              className="rounded-md relative h-[300px] w-full group cursor-pointer transform transition-transform duration-300 hover:scale-105"
-            >
-              <Image
-                src={item.image_url || "/placeholder.svg"}
-                alt={item.name}
-                fill
-                className="rounded-lg object-cover"
-              />
-              
-              <div className="absolute inset-0 rounded-lg group-hover:bg-black/50 transition duration-500 bg-black/20"></div>
+        <div className="mx-auto max-w-[1450px]">
+          {/* ---------- Header ---------- */}
+          <div data-fade className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+              <GiBullHorns className="text-xl" aria-hidden />
+            </span>
+            <span className="text-base font-medium text-[#EEF2E6]/70">
+              Services
+            </span>
+          </div>
 
-              <div className="absolute inset-0 lg:bottom-10 flex justify-center items-end opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="bg-green-900 text-white p-4 rounded-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                  Learn More
-                </div>
-              </div>
+          <h2 className="mt-6 text-[clamp(2.25rem,4.6vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.03em] text-left text-left">
+            {"What we offer".split(" ").map((word, i) => (
+              <span
+                key={i}
+                className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom"
+              >
+                <span data-word className="inline-block will-change-transform">
+                  {word}
+                </span>
+              </span>
+            ))}
+          </h2>
 
-              <div className="absolute inset-0 top-16 left-10 rounded-lg bg-opacity-50 flex justify-start items-start">
-                <div className="flex flex-col space-y-4 text-start group-hover:opacity-15 transition-opacity duration-300">
-                  <h2 className="text-white text-xl font-light italic">{item.extra_data.heading}</h2>
-                  <h2 className="text-white text-2xl lg:text-3xl font-bold">{item.name}</h2>
-                </div>
-              </div>
-            </Link>
-          ))
-        ) : (
-          <div className="text-gray-400 text-center">No services available</div>
-        )}
+          {/* ---------- Cards: stacked on mobile, expanding accordion on desktop ---------- */}
+          <div className="mt-12 flex flex-col gap-3 lg:mt-16 lg:h-[clamp(480px,72svh,620px)] lg:flex-row lg:gap-4">
+            {services.map((item, index) => {
+              const isActive = index === active;
+              return (
+                <Link
+                  key={item.id}
+                  data-card
+                  href={item.extra_data?.url || "/about_us#about-us"}
+                  onMouseEnter={() => setActive(index)}
+                  onFocus={() => setActive(index)}
+                  style={
+                    {
+                      ["--grow" as string]: isActive ? 3.4 : 1,
+                    } as React.CSSProperties
+                  }
+                  className="group relative block h-[340px] overflow-hidden rounded-[28px] bg-[#1F4D36]/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F2B84B] motion-reduce:transition-none lg:h-auto lg:min-w-0 lg:basis-0 lg:[flex-grow:var(--grow)] lg:transition-[flex-grow] lg:duration-700 lg:ease-[cubic-bezier(0.22,1,0.36,1)]"
+                >
+                  <Image
+                    src={item.image_url || "/placeholder.svg"}
+                    alt=""
+                    fill
+                    sizes="(min-width: 1024px) 50vw, 100vw"
+                    className={`object-cover transition-transform duration-[1200ms] ease-out ${
+                      isActive ? "lg:scale-100" : "lg:scale-110"
+                    }`}
+                  />
+
+                  {/* Readability + focus: collapsed cards dim, the open card is full strength */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#07140F]/90 via-[#07140F]/20 to-transparent" />
+                  <div
+                    className={`absolute inset-0 bg-[#07140F] opacity-0 transition-opacity duration-700 ${
+                      isActive ? "" : "lg:opacity-40"
+                    }`}
+                  />
+
+                  {/* Text */}
+                  <div className="absolute inset-x-0 bottom-0 p-6 pr-24 lg:p-8 lg:pr-24">
+                    {item.extra_data?.heading && (
+                      <p
+                        className={`text-base text-[#EEF2E6]/80 transition-all duration-500 ${
+                          isActive
+                            ? "lg:translate-y-0 lg:opacity-100"
+                            : "lg:translate-y-2 lg:opacity-0"
+                        }`}
+                      >
+                        {item.extra_data.heading}
+                      </p>
+                    )}
+                    <h3 className="mt-2 text-2xl font-bold leading-tight tracking-[-0.02em] lg:text-3xl">
+                      {item.name}
+                    </h3>
+                  </div>
+
+                  {/* Notch with the arrow: same carved-corner device as the rest of the site */}
+                  <div
+                    aria-hidden
+                    className="absolute bottom-0 right-0 rounded-tl-[24px] p-2.5"
+                    style={{ background: PINE }}
+                  >
+                    <span
+                      className="pointer-events-none absolute bottom-0 right-full"
+                      style={fillet}
+                    />
+                    <span
+                      className="pointer-events-none absolute bottom-full right-0"
+                      style={fillet}
+                    />
+                    <span
+                      className={`flex h-12 w-12 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F] transition-colors duration-500 ${
+                        isActive ? "" : "lg:bg-white/10 lg:text-[#EEF2E6]"
+                      }`}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        className={`transition-transform duration-500 ${isActive ? "lg:-rotate-45" : ""}`}
+                      >
+                        <path
+                          d="M3 8h10m0 0L9 4m4 4-4 4"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </div>
+
+                  <span className="sr-only">Learn more about {item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 };
 

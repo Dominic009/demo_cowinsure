@@ -1,818 +1,393 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { GiBullHorns } from "react-icons/gi";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Bricolage_Grotesque } from "next/font/google";
 import AppBranding from "@/components/Project/AppBranding";
 import banner from "@/public/field-cow.png";
+import { CATEGORIES, CATEGORY_NAME, GALLERY_DATA, GalleryCategory } from "@/components/GalleryData";
+import GalleryLightbox from "@/components/GalleryLightbox";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-interface GalleryItem {
-  id: number;
-  title: string;
-  category: string;
-  image_url: string;
-  description: string;
-}
+const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
+
+/* Palette (same as the rest of the site)
+   pine #07140F · moss #1F4D36 · bone #EEF2E6 · tag (amber) #F2B84B */
+const BONE = "#EEF2E6";
+const PINE = "#07140F";
+const PAGE_SIZE = 9;
+
+type Filter = "all" | GalleryCategory;
+
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const Arrow = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <path
+      d="M3 8h10m0 0L9 4m4 4-4 4"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const pageBtn =
+  "flex h-11 min-w-11 items-center justify-center rounded-full border px-3 text-base font-medium transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B84B] disabled:pointer-events-none disabled:opacity-30";
 
 const GalleryPage: React.FC = () => {
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [filteredImages, setFilteredImages] = useState<GalleryItem[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const imagesPerPage = 9;
+  const [filter, setFilter] = useState<Filter>("all");
+  const [page, setPage] = useState(1);
+  const [openIndex, setOpenIndex] = useState<number | null>(null); // index within the filtered list
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const heroRef = useRef<HTMLDivElement>(null);
-  const filterRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const imageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const gridRef = useRef<HTMLUListElement>(null);
+  const hasMounted = useRef(false);
 
-  // Extended gallery data with more images for pagination demo
-  const galleryData: GalleryItem[] = [
-    // {
-    //   id: 1,
-    //   title: "Farmer with Cattle",
-    //   category: "farmers",
-    //   image_url: "/farmer-1.png",
-    //   description: "A smallholder farmer with his livestock in Bangladesh",
-    // },
-    // {
-    //   id: 2,
-    //   title: "Farmer with Cattle",
-    //   category: "farmers",
-    //   image_url: "/farmer-2.png",
-    //   description: "A smallholder farmer with his livestock in Bangladesh",
-    // },
-    // {
-    //   id: 3,
-    //   title: "Farmer with Cattle",
-    //   category: "farmers",
-    //   image_url: "/farmer-3.png",
-    //   description: "A smallholder farmer with his livestock in Bangladesh",
-    // },
-    // {
-    //   id: 4,
-    //   title: "Farmer with Cattle",
-    //   category: "farmers",
-    //   image_url: "/farmer-4.png",
-    //   description: "A smallholder farmer with his livestock in Bangladesh",
-    // },
-    // {
-    //   id: 5,
-    //   title: "Farmer with Cattle",
-    //   category: "farmers",
-    //   image_url: "/farmer-5.png",
-    //   description: "A smallholder farmer with his livestock in Bangladesh",
-    // },
-    // {
-    //   id: 6,
-    //   title: "Farmer with Cattle",
-    //   category: "farmers",
-    //   image_url: "/farmer-6.png",
-    //   description: "A smallholder farmer with his livestock in Bangladesh",
-    // },
-    // {
-    //   id: 7,
-    //   title: "Farmer with Cattle",
-    //   category: "farmers",
-    //   image_url: "/farmer-7.png",
-    //   description: "A smallholder farmer with his livestock in Bangladesh",
-    // },
-    // {
-    //   id: 8,
-    //   title: "Farmer with Cattle",
-    //   category: "farmers",
-    //   image_url: "/farmer-8.png",
-    //   description: "A smallholder farmer with his livestock in Bangladesh",
-    // },
+  /* ---------- derived data (no effects, no mirrored state) ---------- */
+  const filtered = useMemo(
+    () =>
+      filter === "all"
+        ? GALLERY_DATA
+        : GALLERY_DATA.filter((i) => i.category === filter),
+    [filter],
+  );
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const offset = (page - 1) * PAGE_SIZE;
+  const pageItems = filtered.slice(offset, offset + PAGE_SIZE);
 
-    // {
-    //   id: 9,
-    //   title: "Yard Meeting & Awareness Campaign",
-    //   category: "campaigns",
-    //   image_url: "/Yard-Meeting-&-Awareness-Campaign-21.jpg",
-    //   description: "",
-    // },
-    {
-      id: 105,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/seminar.jpeg",
-      description: "",
-    },
-      {
-      id: 106,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/seminar2.jpeg",
-      description: "",
-    },
-   
-  
-     {
-      id: 103,
-      title: "Awareness Campaign by our CEO and COO",
-      category: "campaigns",
-      image_url: "/boss1.jpeg",
-      description: "",
-    },
-     {
-      id: 104,
-      title: "Branch Campaign",
-      category: "campaigns",
-      image_url: "/branch.jpeg",
-      description: "",
-    },
-    {
-      id: 10,
-      title: "Training for Farmers and Cattle Rearers",
-      category: "campaigns",
-      image_url: "/Training-for-Farmers-and-Cattle-Rearers.jpg",
-      description: "",
-    },
-    {
-      id: 11,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-16.jpg",
-      description: "",
-    },
-    {
-      id: 12,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-17.jpg",
-      description: "",
-    },
-    {
-      id: 13,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-18.jpg",
-      description: "",
-    },
-    {
-      id: 14,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-20.jpg",
-      description: "",
-    },
-    {
-      id: 15,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-22.jpg",
-      description: "",
-    },
-    {
-      id: 16,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-25.jpg",
-      description: "",
-    },
-    {
-      id: 17,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-26.jpg",
-      description: "",
-    },
-    {
-      id: 18,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-27.jpg",
-      description: "",
-    },
-    {
-      id: 19,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-29.jpg",
-      description: "",
-    },
-    {
-      id: 20,
-      title: "Yard Meeting & Awareness Campaign",
-      category: "campaigns",
-      image_url: "/Yard-Meeting-&-Awareness-Campaign-24.jpg",
-      description: "",
-    },
-    {
-      id: 21,
-      title: "Bangladesh Agriculture University",
-      category: "partnerships",
-      image_url: "/Bangladesh_Agriculture_University.png",
-      description: "",
-    },
-    {
-      id: 22,
-      title: "B-Briddhi",
-      category: "partnerships",
-      image_url: "/bridhi.jpg",
-      description: "",
-    },
-    {
-      id: 23,
-      title: "Swiss Contact",
-      category: "partnerships",
-      image_url: "/BMMDP.jpg",
-      description: "",
-    },
-    {
-      id: 24,
-      title: "Tenity",
-      category: "partnerships",
-      image_url: "/tenity.png",
-      description: "",
-    },
-    {
-      id: 99,
-      title: "Accelerating Asia",
-      category: "partnerships",
-      image_url: "/accelaringasia.jpg",
-      description: "",
-    },
-    {
-      id: 25,
-      title: "Briddhi",
-      category: "achievements",
-      image_url: "/bridhi.jpg",
-      description: "Impact Ready Matching Fund (IRMF)",
-    },
-    {
-      id: 26,
-      title: "GITEX Global 2023",
-      category: "achievements",
-      image_url: "/dubai2023.png",
-      description: "Supernova Insurtech Disruptor Champion - Prize $8000",
-    },
-    {
-      id: 27,
-      title: "Huawei ICT Incubator 2022",
-      category: "achievements",
-      image_url: "/huawei.webp",
-      description: "Winner - Prize $12500",
-    },
-    {
-      id: 28,
-      title: "She Loves Tech Bangladesh 2023 Competition Winner",
-      category: "achievements",
-      image_url: "/achivement.jpeg",
-      description: "",
-    },
-    {
-      id: 29,
-      title: "MENA Insurtech Summit 2024 Winner",
-      category: "achievements",
-      image_url: "/InsurTech-2024.jpg",
-      description: "",
-    },
+  const filters: { id: Filter; name: string; count: number }[] = [
+    { id: "all", name: "All", count: GALLERY_DATA.length },
+    ...CATEGORIES.map((c) => ({
+      id: c.id as Filter,
+      name: c.name,
+      count: GALLERY_DATA.filter((i) => i.category === c.id).length,
+    })),
   ];
 
-  const categories = [
-    // { id: "all", name: "All", count: galleryData.length },
-    // {
-    //   id: "farmers",
-    //   name: "Farmers",
-    //   count: galleryData.filter((item) => item.category === "farmers").length,
-    // },
-    {
-      id: "campaigns",
-      name: "Campaigns",
-      count: galleryData.filter((item) => item.category === "campaigns").length,
-    },
-    {
-      id: "partnerships",
-      name: "Partnerships",
-      count: galleryData.filter((item) => item.category === "partnerships")
-        .length,
-    },
-    {
-      id: "achievements",
-      name: "Achievements",
-      count: galleryData.filter((item) => item.category === "achievements")
-        .length,
-    },
-  ];
+  const lightboxItems = useMemo(
+    () => filtered.map((i) => ({ ...i, tag: CATEGORY_NAME[i.category] })),
+    [filtered],
+  );
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredImages.length / imagesPerPage);
-  const startIndex = (currentPage - 1) * imagesPerPage;
-  const endIndex = startIndex + imagesPerPage;
-  const currentImages = filteredImages.slice(startIndex, endIndex);
+  /* ---------- motion: first view reveals on scroll, later changes fade the new photos in ---------- */
+  useIsoLayoutEffect(() => {
+    if (prefersReducedMotion()) return;
 
-  useEffect(() => {
-    let filtered: GalleryItem[];
-    if (selectedCategory === "all") {
-      filtered = galleryData;
-    } else {
-      filtered = galleryData.filter(
-        (item) => item.category === selectedCategory
-      );
-    }
-    setFilteredImages(filtered);
-    setCurrentPage(1); // Reset to first page when category changes
-  }, [selectedCategory]);
-
-  useEffect(() => {
     const ctx = gsap.context(() => {
-      // Hero section animation
-      gsap.set([heroRef.current], {
-        y: 50,
-        opacity: 0,
-      });
+      if (!hasMounted.current) {
+        hasMounted.current = true;
 
-      // Filter buttons animation
-      gsap.set(filterRef.current?.children || [], {
-        y: 30,
-        opacity: 0,
-      });
+        gsap
+          .timeline({
+            scrollTrigger: {
+              trigger: "[data-intro]",
+              start: "top 80%",
+              once: true,
+            },
+          })
+          .from("[data-fade]", {
+            y: 16,
+            opacity: 0,
+            duration: 0.7,
+            ease: "power3.out",
+            stagger: 0.1,
+          })
+          .fromTo(
+            "[data-word]",
+            { yPercent: 115 },
+            { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.05 },
+            "-=0.5",
+          );
 
-      // Gallery grid animation
-      gsap.set(imageRefs.current, {
-        y: 60,
-        opacity: 0,
-        scale: 0.9,
-      });
-
-      // Hero animation timeline
-      const heroTl = gsap.timeline({
-        scrollTrigger: {
-          trigger: heroRef.current,
-          start: "top 80%",
-          end: "bottom 20%",
-          toggleActions: "play none none reverse",
-        },
-      });
-
-      heroTl.to(heroRef.current, {
-        duration: 0.8,
-        y: 0,
-        opacity: 1,
-        ease: "power2.out",
-      });
-
-      // Filter buttons animation
-      const filterTl = gsap.timeline({
-        scrollTrigger: {
-          trigger: filterRef.current,
-          start: "top 80%",
-          end: "bottom 20%",
-          toggleActions: "play none none reverse",
-        },
-      });
-
-      filterTl.to(filterRef.current?.children || [], {
-        duration: 0.6,
-        y: 0,
-        opacity: 1,
-        ease: "power2.out",
-        stagger: 0.1,
-      });
-
-      // Gallery grid animation
-      const gridTl = gsap.timeline({
-        scrollTrigger: {
-          trigger: gridRef.current,
-          start: "top 80%",
-          end: "bottom 20%",
-          toggleActions: "play none none reverse",
-        },
-      });
-
-      gridTl.to(imageRefs.current, {
-        duration: 0.8,
-        y: 0,
-        opacity: 1,
-        scale: 1,
-        ease: "power2.out",
-        stagger: 0.15,
-      });
-    }, containerRef);
+        gsap.fromTo(
+          "[data-card]",
+          { clipPath: "inset(100% 0% 0% 0% round 28px)" },
+          {
+            clipPath: "inset(0% 0% 0% 0% round 28px)",
+            duration: 1,
+            ease: "expo.inOut",
+            stagger: 0.08,
+            scrollTrigger: {
+              trigger: gridRef.current,
+              start: "top 80%",
+              once: true,
+            },
+          },
+        );
+      } else {
+        gsap.fromTo(
+          "[data-card]",
+          { y: 20, opacity: 0 },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.6,
+            ease: "power3.out",
+            stagger: 0.05,
+          },
+        );
+      }
+    }, rootRef);
 
     return () => ctx.revert();
-  }, [currentImages]);
+  }, [filter, page]);
 
-  const handleCategoryChange = (category: string) => {
-    // Animate out current images
-    gsap.to(imageRefs.current, {
-      duration: 0.3,
-      y: 20,
-      opacity: 0,
-      scale: 0.95,
-      stagger: 0.05,
-      onComplete: () => {
-        setSelectedCategory(category);
-        // Animate in new images
-        setTimeout(() => {
-          gsap.fromTo(
-            imageRefs.current,
-            { y: 20, opacity: 0, scale: 0.95 },
-            {
-              duration: 0.6,
-              y: 0,
-              opacity: 1,
-              scale: 1,
-              ease: "power2.out",
-              stagger: 0.1,
-            }
-          );
-        }, 100);
-      },
-    });
+  const changeFilter = (next: Filter) => {
+    if (next === filter) return;
+    setFilter(next);
+    setPage(1);
   };
 
-  const handlePageChange = (page: number) => {
-    // Animate out current images
-    gsap.to(imageRefs.current, {
-      duration: 0.3,
-      y: 20,
-      opacity: 0,
-      scale: 0.95,
-      stagger: 0.05,
-      onComplete: () => {
-        setCurrentPage(page);
-        // Animate in new images
-        setTimeout(() => {
-          gsap.fromTo(
-            imageRefs.current,
-            { y: 20, opacity: 0, scale: 0.95 },
-            {
-              duration: 0.6,
-              y: 0,
-              opacity: 1,
-              scale: 1,
-              ease: "power2.out",
-              stagger: 0.1,
-            }
-          );
-        }, 100);
-      },
+  const changePage = (next: number) => {
+    setPage(next);
+    panelRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+      block: "start",
     });
   };
-
-  const openModal = (image: GalleryItem) => {
-    const imageIndex = filteredImages.findIndex((img) => img.id === image.id);
-    setSelectedImage(image);
-    setSelectedImageIndex(imageIndex);
-    // Modal animation
-    gsap.fromTo(
-      ".modal-overlay",
-      { opacity: 0 },
-      { duration: 0.3, opacity: 1, ease: "power2.out" }
-    );
-    gsap.fromTo(
-      ".modal-image",
-      { scale: 0.5, opacity: 0 },
-      { duration: 0.5, scale: 1, opacity: 1, ease: "back.out(1.7)" }
-    );
-  };
-
-  const closeModal = () => {
-    gsap.to(".modal-overlay", {
-      duration: 0.3,
-      opacity: 0,
-      ease: "power2.out",
-    });
-    gsap.to(".modal-image", {
-      duration: 0.4,
-      scale: 0.5,
-      opacity: 0,
-      ease: "back.in(1.7)",
-      onComplete: () => setSelectedImage(null),
-    });
-  };
-
-  const navigateImage = (direction: "prev" | "next") => {
-    let newIndex: number;
-    if (direction === "prev") {
-      newIndex =
-        selectedImageIndex > 0
-          ? selectedImageIndex - 1
-          : filteredImages.length - 1;
-    } else {
-      newIndex =
-        selectedImageIndex < filteredImages.length - 1
-          ? selectedImageIndex + 1
-          : 0;
-    }
-
-    // Animate image transition
-    gsap.to(".modal-image", {
-      duration: 0.2,
-      scale: 0.8,
-      opacity: 0,
-      ease: "power2.out",
-      onComplete: () => {
-        setSelectedImage(filteredImages[newIndex]);
-        setSelectedImageIndex(newIndex);
-        gsap.fromTo(
-          ".modal-image",
-          { scale: 0.8, opacity: 0 },
-          { duration: 0.3, scale: 1, opacity: 1, ease: "power2.out" }
-        );
-      },
-    });
-  };
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (selectedImage) {
-        if (e.key === "ArrowLeft") {
-          navigateImage("prev");
-        } else if (e.key === "ArrowRight") {
-          navigateImage("next");
-        } else if (e.key === "Escape") {
-          closeModal();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [selectedImage, selectedImageIndex, filteredImages]);
 
   return (
-    <div ref={containerRef} className="lg:h-auto h-auto">
+    <div
+      ref={rootRef}
+      className={`${display.className} text-[#07140F]`}
+      style={{ background: BONE }}
+    >
       <AppBranding
         title="Visual Journey of Rural Transformation"
         bannerUrl={banner}
       />
 
-      {/* Hero Section */}
-      <div
-        ref={heroRef}
-        className="min-h-[400px] flex items-center justify-center bg-white"
+      {/* ================= INTRO ================= */}
+      <section
+        data-intro
+        aria-label="About the gallery"
+        className="px-5 py-20 md:px-10 lg:px-16 lg:py-28"
       >
-        <div className="text-center px-4 py-16">
-          <GiBullHorns className="w-auto text-4xl text-green-700 mb-4 mx-auto" />
-          <span className="text-sm text-[#687469] uppercase font-semibold">
-            Our Gallery
-          </span>
-          <h1 className="text-4xl lg:text-6xl font-bold text-[#334b35] mt-2 mb-6">
-            Capturing Impact Through Images
-          </h1>
-          <p className="text-xl text-[#687469] max-w-3xl mx-auto">
+        <div className="mx-auto grid max-w-[1450px] items-end gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
+          <div>
+            <div data-fade className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+                <GiBullHorns className="text-xl" aria-hidden />
+              </span>
+              <span className="text-base font-medium text-[#1F4D36]">
+                Our gallery
+              </span>
+            </div>
+
+            <h1 className="mt-6 text-[clamp(2.25rem,5.2vw,4.75rem)] font-bold leading-[1.04] tracking-[-0.03em]">
+              {"Capturing impact through images".split(" ").map((word, i) => (
+                <span
+                  key={i}
+                  className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom"
+                >
+                  <span
+                    data-word
+                    className="inline-block will-change-transform"
+                  >
+                    {word}
+                  </span>
+                </span>
+              ))}
+            </h1>
+          </div>
+
+          <p
+            data-fade
+            className="max-w-[44ch] text-lg leading-relaxed text-[#07140F]/70"
+          >
             Explore our visual story of transforming rural economies, empowering
             farmers, and building sustainable agricultural communities through
             innovative technology and partnerships.
           </p>
         </div>
-      </div>
+      </section>
 
-      {/* Filter Section */}
-      <div className="bg-[#F7F7F7] py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <div
-            ref={filterRef}
-            className="flex flex-wrap justify-center gap-4 mb-8"
-          >
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => handleCategoryChange(category.id)}
-                className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:shadow-md ${
-                  selectedCategory === category.id
-                    ? "bg-green-700 text-white shadow-lg"
-                    : "bg-white text-[#334b35] hover:bg-green-50"
-                }`}
-              >
-                {category.name} ({category.count})
-              </button>
-            ))}
-          </div>
-
-          {/* Gallery Grid */}
-          <div
-            ref={gridRef}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12"
-          >
-            {currentImages.map((item, index) => (
-              <div
-                key={item.id}
-                ref={(el) => {
-                  imageRefs.current[index] = el;
-                }}
-                className="gallery-item bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                onClick={() => openModal(item)}
-              >
-                <div className="relative h-64 overflow-hidden">
-                  <Image
-                    src={item.image_url || "/placeholder.svg"}
-                    alt={item.title}
-                    fill
-                    className="object-contain transition-transform duration-500 group-hover:scale-110"
-                    unoptimized
-                  />
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
-                    <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <svg
-                        className="w-12 h-12"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M3 4a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm5 3a2 2 0 11-4 0 2 2 0 014 0zm4.5 8.5l-3-3-1.5 1.5-3-3V16h7.5z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <span className="text-xs text-green-700 uppercase font-semibold tracking-wider">
-                    {item.category}
-                  </span>
-                  <h3 className="text-xl font-bold text-[#334b35] mt-2 mb-3">
-                    {item.title}
-                  </h3>
-                  <p className="text-[#687469] text-sm leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-2">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-4 py-2 rounded-lg bg-white text-[#334b35] font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-50 transition-all duration-300"
-              >
-                Previous
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
+      {/* ================= FILTERS + GRID ================= */}
+      <section
+        ref={panelRef}
+        aria-label="Photos"
+        className="scroll-mt-4 p-2 sm:p-3 lg:p-4"
+      >
+        <div
+          className="rounded-[28px] px-5 py-12 text-[#EEF2E6] md:px-10 lg:px-16 lg:py-20"
+          style={{ background: PINE }}
+        >
+          <div className="mx-auto max-w-[1450px]">
+            {/* Filters */}
+            <div
+              role="group"
+              aria-label="Filter photos by category"
+              className="flex flex-wrap gap-3"
+            >
+              {filters.map((f) => {
+                const active = filter === f.id;
+                return (
                   <button
-                    key={page}
-                    onClick={() => handlePageChange(page)}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
-                      currentPage === page
-                        ? "bg-green-700 text-white shadow-lg"
-                        : "bg-white text-[#334b35] hover:bg-green-50"
+                    key={f.id}
+                    type="button"
+                    onClick={() => changeFilter(f.id)}
+                    aria-pressed={active}
+                    className={`flex items-center gap-2 rounded-full border px-5 py-2.5 text-base font-medium transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B84B] ${
+                      active
+                        ? "border-[#F2B84B] bg-[#F2B84B] text-[#07140F]"
+                        : "border-white/25 hover:bg-white/10"
                     }`}
                   >
-                    {page}
+                    {f.name}
+                    <span
+                      className={`text-sm tabular-nums ${active ? "text-[#07140F]/70" : "text-[#EEF2E6]/55"}`}
+                    >
+                      {f.count}
+                    </span>
                   </button>
-                )
-              )}
-
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 rounded-lg bg-white text-[#334b35] font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-50 transition-all duration-300"
-              >
-                Next
-              </button>
+                );
+              })}
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Statistics Section */}
-      {/* <div className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <GiBullHorns className="w-auto text-3xl text-green-700 mb-4 mx-auto" />
-          <h2 className="text-4xl lg:text-5xl font-bold text-[#334b35] mb-12">
-            Our Impact in Numbers
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              { number: "5,000+", label: "Farmers Supported" },
-              { number: "500M", label: "Smallholder Farmers Globally" },
-              { number: "16.6M", label: "Farmers in Bangladesh" },
-              { number: "0.3%", label: "Livestock Currently Insured" },
-            ].map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="text-4xl lg:text-5xl font-bold text-green-700 mb-2">
-                  {stat.number}
-                </div>
-                <div className="text-lg text-[#687469] font-medium">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
+            {/* Grid */}
+            <ul
+              ref={gridRef}
+              className="mt-10 grid gap-4 sm:grid-cols-2 lg:mt-12 lg:grid-cols-3 lg:gap-5"
+            >
+              {pageItems.map((item, i) => {
+                const isLogo = item.category === "partnerships";
+                return (
+                  <li key={item.id} data-card className="h-full">
+                    <button
+                      type="button"
+                      onClick={() => setOpenIndex(offset + i)}
+                      aria-haspopup="dialog"
+                      aria-label={`Open photo: ${item.title}`}
+                      className="group flex h-full w-full flex-col rounded-[28px] bg-[#EEF2E6] p-3 text-left text-[#07140F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F2B84B]"
+                    >
+                      <span
+                        className={`relative block h-[250px] overflow-hidden rounded-[20px] ${
+                          isLogo ? "bg-[#F8FAF3]" : "bg-[#1F4D36]/15"
+                        }`}
+                      >
+                        <Image
+                          src={item.image_url || "/placeholder.svg"}
+                          alt=""
+                          fill
+                          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                          unoptimized
+                          className={`transition-transform duration-[1200ms] ease-out group-hover:scale-105 motion-reduce:transition-none ${
+                            isLogo
+                              ? "object-contain p-8"
+                              : "object-cover object-center"
+                          }`}
+                        />
+                        <span
+                          aria-hidden
+                          className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#07140F]/60 text-[#EEF2E6] opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                          >
+                            <path
+                              d="M4 12 12 4m0 0H6m6 0v6"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </span>
+                      </span>
+
+                      <span className="block px-3 pb-3 pt-5">
+                        <span className="inline-block rounded-full bg-[#1F4D36]/10 px-3 py-1 text-sm font-medium text-[#1F4D36]">
+                          {CATEGORY_NAME[item.category]}
+                        </span>
+                        <span className="mt-3 block text-xl font-bold leading-tight tracking-[-0.01em]">
+                          {item.title}
+                        </span>
+                        {item.description && (
+                          <span className="mt-2 block text-base leading-relaxed text-[#07140F]/65">
+                            {item.description}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <nav
+                aria-label="Gallery pages"
+                className="mt-12 flex flex-wrap items-center justify-center gap-2"
+              >
+                <button
+                  type="button"
+                  onClick={() => changePage(page - 1)}
+                  disabled={page === 1}
+                  aria-label="Previous page"
+                  className={`${pageBtn} rotate-180 border-white/25 hover:bg-[#F2B84B] hover:text-[#07140F]`}
+                >
+                  <Arrow />
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => changePage(p)}
+                      aria-label={`Page ${p}`}
+                      aria-current={p === page ? "page" : undefined}
+                      className={`${pageBtn} tabular-nums ${
+                        p === page
+                          ? "border-[#F2B84B] bg-[#F2B84B] text-[#07140F]"
+                          : "border-white/25 hover:bg-white/10"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => changePage(page + 1)}
+                  disabled={page === totalPages}
+                  aria-label="Next page"
+                  className={`${pageBtn} border-white/25 hover:bg-[#F2B84B] hover:text-[#07140F]`}
+                >
+                  <Arrow />
+                </button>
+              </nav>
+            )}
           </div>
         </div>
-      </div> */}
+      </section>
 
-      {/* Modal */}
-      {selectedImage && (
-        <div
-          className="modal-overlay fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
-          onClick={closeModal}
-        >
-          <div
-            className="relative max-w-[90vw] max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Navigation Arrows */}
-            <button
-              onClick={() => navigateImage("prev")}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded-full p-3 transition-all duration-200"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </button>
-
-            <button
-              onClick={() => navigateImage("next")}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded-full p-3 transition-all duration-200"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
-
-            {/* Close Button */}
-            <button
-              onClick={closeModal}
-              className="absolute -top-12 right-0 z-10 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-3 transition-all duration-200"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-
-            {/* Image Counter */}
-            <div className="absolute -top-12 left-0 z-10 bg-black bg-opacity-50 text-white px-4 py-2 rounded-lg">
-              {selectedImageIndex + 1} / {filteredImages.length}
-            </div>
-
-            <div className="modal-image relative">
-              <Image
-                src={selectedImage.image_url || "/placeholder.svg"}
-                alt={selectedImage.title}
-                width={1200}
-                height={800}
-                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-                unoptimized
-              />
-
-              {/* Image Info Overlay */}
-              {/* <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/70 to-transparent p-6 rounded-b-lg">
-                <span className="text-sm text-green-400 uppercase font-semibold tracking-wider">
-                  {selectedImage.category}
-                </span>
-                <h3 className="text-2xl lg:text-3xl font-bold text-white mt-2 mb-2">
-                  {selectedImage.title}
-                </h3>
-                <p className="text-gray-200 leading-relaxed">
-                  {selectedImage.description}
-                </p>
-              </div> */}
-            </div>
-          </div>
-        </div>
-      )}
+      <GalleryLightbox
+        items={lightboxItems}
+        index={openIndex}
+        onClose={() => setOpenIndex(null)}
+        onChange={setOpenIndex}
+      />
     </div>
   );
 };
