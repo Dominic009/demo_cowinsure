@@ -1,19 +1,25 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
+
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Autoplay, Navigation } from "swiper/modules";
+import Link from "next/link";
 import { GiBullHorns } from "react-icons/gi";
-import gsap from "gsap";
-import ScrollTrigger from "gsap/ScrollTrigger";
-import BackgroundImageLayer from "../common/BackgroundImageLayer";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Bricolage_Grotesque } from "next/font/google";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
+
+/* Palette (same as the rest of the site)
+   pine #07140F · moss #1F4D36 · bone #EEF2E6 · tag (amber) #F2B84B
+   BONE is the section background; keep it equal to the other files. */
+const BONE = "#EEF2E6";
+
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface ExtraData {
   heading: string;
@@ -49,279 +55,176 @@ interface BaseCategoryApiResponse {
   data: BaseCategory[];
 }
 
-const WhyInvestWithUs: React.FC = () => {
-  const [whyInvestData, setWhyInvestData] = useState<BaseCard[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const iconRef = useRef<HTMLDivElement | null>(null);
-  const subtitleRef = useRef<HTMLHeadingElement | null>(null);
-  const titleRef = useRef<HTMLHeadingElement | null>(null);
-  const titleDescRef = useRef<HTMLParagraphElement | null>(null);
-  const swiperRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const descriptionRefs = useRef<(HTMLDivElement | null)[]>([]);
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+const WhyInvestWithUs: React.FC = () => {
+  const [reasons, setReasons] = useState<BaseCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const rootRef = useRef<HTMLElement>(null);
+
+  /* ---------- data ---------- */
   useEffect(() => {
-    const fetchBaseCategories = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-categories/`,
-        );
-        const result: BaseCategoryApiResponse = await response.json();
-        if (result.status === "success") {
-          const whyInvestCategory = result.data.find(
-            (category) => category.name === "why Invest With Us",
-          );
-          if (whyInvestCategory) {
-            fetchBaseCards(whyInvestCategory.id);
-          } else {
-            setIsLoading(false);
-          }
-        } else {
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Error fetching base categories:", error);
-        setIsLoading(false);
-      }
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    const fetchCards = async (categoryId: string) => {
+      const res = await fetch(`${base}/base-category/${categoryId}/base-cards/`);
+      const result: BaseCardApiResponse = await res.json();
+      if (result.status === "success") setReasons(result.data);
     };
 
-    const fetchBaseCards = async (categoryId: string) => {
+    const load = async () => {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-category/${categoryId}/base-cards/`,
-        );
-        const result: BaseCardApiResponse = await response.json();
+        const res = await fetch(`${base}/base-categories/`);
+        const result: BaseCategoryApiResponse = await res.json();
         if (result.status === "success") {
-          setWhyInvestData(result.data);
+          const category = result.data.find((c) => c.name === "why Invest With Us");
+          if (category) await fetchCards(category.id);
         }
       } catch (error) {
-        console.error("Error fetching base cards:", error);
+        console.error("Error fetching reasons to invest:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBaseCategories();
+    load();
   }, []);
 
-  useEffect(() => {
-    if (!isLoading && whyInvestData.length > 0) {
-      const ctx = gsap.context(() => {
-        gsap.set(
-          [
-            iconRef.current,
-            subtitleRef.current,
-            titleRef.current,
-            titleDescRef.current,
-          ],
-          {
-            opacity: 0,
-            y: -100,
-          },
-        );
-        gsap.set(swiperRef.current, {
-          opacity: 0,
-          x: -100,
-        });
-        gsap.set(cardRefs.current, {
-          opacity: 0,
-          y: 50,
-          scale: 0.8,
-        });
-        gsap.set(descriptionRefs.current, {
-          opacity: 0,
-          y: 50,
-          scale: 0.8,
-        });
+  /* ---------- scroll: headline rises once; each reason reveals as it comes into view ---------- */
+  useIsoLayoutEffect(() => {
+    if (isLoading || reasons.length === 0 || prefersReducedMotion()) return;
 
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: containerRef.current,
-            start: "top 80%",
-            end: "bottom 20%",
-            toggleActions: "play none none reverse",
-          },
-        });
-        tl.to(iconRef.current, {
-          opacity: 1,
-          y: 0,
-          duration: 0.35,
-          ease: "power2.out",
-        });
-        tl.to(
-          subtitleRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.35,
-            delay: 0.35,
-            ease: "power2.out",
-          },
-          "-=0.5",
+    const ctx = gsap.context(() => {
+      gsap
+        .timeline({ scrollTrigger: { trigger: rootRef.current, start: "top 70%", once: true } })
+        .from("[data-fade]", { y: 16, opacity: 0, duration: 0.7, ease: "power3.out", stagger: 0.1 })
+        .fromTo(
+          "[data-word]",
+          { yPercent: 115 },
+          { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.06 },
+          "-=0.5"
         );
-        tl.to(
-          titleRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.35,
-            delay: 0.35,
-            ease: "power2.out",
-          },
-          "-=0.5",
-        );
-        tl.to(
-          titleDescRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.35,
-            delay: 0.35,
-            ease: "power2.out",
-          },
-          "-=0.5",
-        );
-        tl.to(
-          swiperRef.current,
-          {
-            opacity: 1,
-            x: 0,
-            duration: 0.25,
-            ease: "power2.out",
-          },
-          "-=0.3",
-        );
-        tl.to(
-          cardRefs.current,
-          {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            duration: 0.25,
-            delay: 0.5,
-            ease: "back.out(1.7)",
-            stagger: {
-              amount: 0.5,
-              from: "start",
-            },
-          },
-          "-=0.5",
-        );
-        tl.to(
-          descriptionRefs.current,
-          {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            duration: 0.25,
-            ease: "back.out(1.7)",
-            stagger: {
-              amount: 0.5,
-              from: "start",
-            },
-          },
-          "-=0.5",
-        );
-      }, containerRef);
-      return () => ctx.revert();
-    }
-  }, [isLoading, whyInvestData]);
 
+      rootRef.current?.querySelectorAll<HTMLElement>("[data-row]").forEach((row) => {
+        const q = gsap.utils.selector(row);
+        gsap
+          .timeline({ scrollTrigger: { trigger: row, start: "top 85%", once: true } })
+          .fromTo(
+            q("[data-img]"),
+            { clipPath: "inset(0% 100% 0% 0% round 20px)" },
+            { clipPath: "inset(0% 0% 0% 0% round 20px)", duration: 1, ease: "expo.inOut" }
+          )
+          .from(q("[data-text]"), { y: 20, opacity: 0, duration: 0.7, ease: "power3.out", stagger: 0.08 }, "-=0.6");
+      });
+    }, rootRef);
+
+    return () => ctx.revert();
+  }, [isLoading, reasons]);
+
+  /* ---------- states ---------- */
   if (isLoading) {
     return (
-      <div className="relative flex flex-col mt-10 justify-center items-center lg:flex-col lg:justify-center lg:items-center w-full lg:h-[700px] h-auto p-5">
-        <BackgroundImageLayer imageUrl="/farmpic.png" opacity={0.07} />
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading investing reasons...</p>
+      <section aria-busy="true" className="px-5 py-20 md:px-10 lg:px-16 lg:py-28" style={{ background: BONE }}>
+        <div className="mx-auto grid max-w-[1450px] animate-pulse gap-12 lg:grid-cols-[5fr_7fr] lg:gap-16">
+          <div className="space-y-4">
+            <div className="h-10 w-40 rounded-full bg-[#1F4D36]/10" />
+            <div className="h-16 w-full rounded-lg bg-[#1F4D36]/10" />
+            <div className="h-6 w-3/4 rounded-lg bg-[#1F4D36]/10" />
+          </div>
+          <div className="space-y-6">
+            {[0, 1, 2].map((n) => (
+              <div key={n} className="h-36 rounded-[20px] bg-[#1F4D36]/10" />
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
+  if (reasons.length === 0) return null;
+
   return (
-    <div
-      ref={containerRef}
-      className="relative  mx-auto flex flex-col justify-center items-center lg:flex-col lg:justify-center lg:items-center w-full lg:h-auto h-auto p-5"
+    <section
+      ref={rootRef}
+      aria-label="Why invest with us"
+      className={`${display.className} px-5 py-20 text-[#07140F] md:px-10 lg:px-16 lg:py-28`}
+      style={{ background: BONE }}
     >
-      <BackgroundImageLayer imageUrl="/farmpic.png" opacity={0.07} />
-      <div className="flex-1 flex flex-col justify-center items-center max-w-4xl text-center w-full">
-        <div ref={iconRef}>
-          <GiBullHorns className="lg:w-auto w-full text-2xl text-start text-green-700 mb-2" />
+      <div className="mx-auto grid max-w-[1450px] gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
+        {/* ---------- Left: headline stays in view while the reasons scroll ---------- */}
+        <div className="lg:sticky lg:top-28 lg:self-start">
+          <div data-fade className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+              <GiBullHorns className="text-xl" aria-hidden />
+            </span>
+            <span className="text-base font-medium text-[#1F4D36]">Our goal</span>
+          </div>
+
+          <h2 className="mt-6 text-[clamp(2.25rem,4.6vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.03em] text-left">
+            {"Why invest with us".split(" ").map((word, i) => (
+              <span key={i} className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom">
+                <span data-word className="inline-block will-change-transform">
+                  {word}
+                </span>
+              </span>
+            ))}
+          </h2>
+
+          <p data-fade className="mt-6 max-w-[36ch] text-xl leading-snug text-[#1F4D36] lg:text-2xl text-left">
+            Our end-to-end value-chain approach unlocks concrete growth opportunities.
+          </p>
+
+          <div data-fade className="mt-8 text-left">
+            <Link
+              href="/project"
+              className="group inline-flex items-center gap-3 rounded-full bg-[#07140F] py-1.5 pl-6 pr-1.5 text-base font-medium text-[#EEF2E6] transition-colors duration-300 hover:bg-[#1F4D36] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F2B84B]"
+            >
+              Explore our projects
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F] transition-transform duration-300 group-hover:translate-x-1">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path d="M3 8h10m0 0L9 4m4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+            </Link>
+          </div>
         </div>
-        <h2
-          ref={subtitleRef}
-          className="text-xl font-bold text-[#687469] text-start mb-3"
-        >
-          our goal
-        </h2>
-        <h1
-          ref={titleRef}
-          className="lg:text-5xl text-2xl min-w-[150px] mb-5 font-bold text-[#334b35] text-start"
-        >
-          Why Invest With Us
-        </h1>
-        <p
-          ref={titleDescRef}
-          className="text-center font-semibold text-gray-500 mb-10 text-xl lg:text-2xl lg:max-w-[900px]"
-        >
-          Our end-to-end value-chain approach unlocks concrete growth
-          opportunities.
-        </p>
-      </div>
-      <div ref={swiperRef} className="w-full lg:mt-20">
-        <Swiper
-          breakpoints={{
-            640: { slidesPerView: 1 },
-            768: { slidesPerView: 2 },
-            1024: { slidesPerView: 3 },
-            1280: { slidesPerView: 4 },
-          }}
-          spaceBetween={50}
-          loop={true}
-          pagination={{ clickable: false }}
-          autoplay={{ delay: 3000, disableOnInteraction: false }}
-          modules={[Navigation, Autoplay]}
-          className="lg:max-w-[78%]"
-        >
-          {whyInvestData.map((item, index) => (
-            <SwiperSlide key={item.id}>
+
+        {/* ---------- Right: the reasons ---------- */}
+        <ul className="border-b border-[#07140F]/10">
+          {reasons.map((item) => (
+            <li
+              key={item.id}
+              data-row
+              className="group grid gap-5 border-t border-[#07140F]/10 py-8 sm:grid-cols-[200px_1fr] sm:gap-8 lg:grid-cols-[220px_1fr]"
+            >
               <div
-                ref={(el) => {
-                  cardRefs.current[index] = el;
-                }}
-                className="bg-white rounded-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 max-w-sm mx-auto"
+                data-img
+                className="relative h-[190px] overflow-hidden rounded-[20px] bg-[#1F4D36]/15 sm:h-[160px] lg:h-[170px]"
               >
-                <div className="relative w-full h-48 overflow-hidden">
-                  <Image
-                    src={item.image_url || "/placeholder.svg"}
-                    alt={item.name}
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
-                  <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity duration-300 flex justify-center items-center"></div>
-                </div>
+                <Image
+                  src={item.image_url || "/placeholder.svg"}
+                  alt={item.name}
+                  fill
+                  sizes="(min-width: 1024px) 220px, (min-width: 640px) 200px, 100vw"
+                  className="object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-105 motion-reduce:transition-none"
+                />
               </div>
-              <div
-                ref={(el) => {
-                  descriptionRefs.current[index] = el;
-                }}
-                className="text-start mt-2"
-              >
-                <h1 className="lg:text-2xl text-xl min-w-[150px] mb-2 font-bold text-[#334b35] text-start">
-                  {item.extra_data.heading}
-                </h1>
-                <p className="text-start font-light text-gray-500 text-xl">
-                  {item.extra_data.short_description}
+
+              <div className="flex flex-col justify-center text-left">
+                <h3 data-text className="text-2xl font-bold leading-tight tracking-[-0.02em] lg:text-[1.75rem]">
+                  {item.extra_data?.heading}
+                </h3>
+                <p data-text className="mt-3 max-w-[52ch] text-base leading-relaxed text-[#07140F]/70 lg:text-lg">
+                  {item.extra_data?.short_description}
                 </p>
               </div>
-            </SwiperSlide>
+            </li>
           ))}
-        </Swiper>
+        </ul>
       </div>
-    </div>
+    </section>
   );
 };
 

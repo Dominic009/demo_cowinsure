@@ -1,20 +1,26 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
+
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Autoplay, Navigation } from "swiper/modules";
-import { GiBullHorns } from "react-icons/gi";
 import Link from "next/link";
+import { GiBullHorns } from "react-icons/gi";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Bricolage_Grotesque } from "next/font/google";
 
-// Register ScrollTrigger plugin
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
+
+/* Palette (same as the rest of the site)
+   pine #07140F · moss #1F4D36 · bone #EEF2E6 · tag (amber) #F2B84B
+   BONE is the section background; keep it equal to the other files. */
+const BONE = "#EEF2E6";
+
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface BaseCategory {
   id: string;
@@ -29,14 +35,6 @@ interface BaseCategoryApiResponse {
 }
 
 interface ExtraData {
-  color: string;
-  cowId: string;
-  price: number;
-  teeth: number;
-  gender: string;
-  cowBreed: string;
-  currentLiveWeight: number;
-  expectedFinalWeight: number;
   url: string;
 }
 
@@ -57,241 +55,204 @@ interface BaseCardApiResponse {
   data: BaseCard[];
 }
 
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const isExternal = (url: string) => /^https?:\/\//i.test(url);
+
 const PartnerAndInvestorSection = () => {
   const [partners, setPartners] = useState<BaseCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const rootRef = useRef<HTMLElement>(null);
 
-  // Refs for GSAP animations
-  const containerRef = useRef<HTMLDivElement>(null);
-  const iconRef = useRef<HTMLDivElement>(null);
-  const subtitleRef = useRef<HTMLHeadingElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const swiperRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-
+  /* ---------- data (the old version stayed on "Loading" if the category was missing) ---------- */
   useEffect(() => {
-    const fetchBaseCategories = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-categories/`
-        );
-        const result: BaseCategoryApiResponse = await response.json();
-        if (result.status === "success") {
-          const partnersCategory = result.data.find(
-            (category) => category.name === "Partners"
-          );
-          if (partnersCategory) {
-            fetchBaseCards(partnersCategory.id);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching base categories:", error);
-        setIsLoading(false);
-      }
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    const fetchCards = async (categoryId: string) => {
+      const res = await fetch(
+        `${base}/base-category/${categoryId}/base-cards/`,
+      );
+      const result: BaseCardApiResponse = await res.json();
+      if (result.status === "success") setPartners(result.data);
     };
 
-    const fetchBaseCards = async (categoryId: string) => {
+    const load = async () => {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-category/${categoryId}/base-cards/`
-        );
-        const result: BaseCardApiResponse = await response.json();
+        const res = await fetch(`${base}/base-categories/`);
+        const result: BaseCategoryApiResponse = await res.json();
         if (result.status === "success") {
-          setPartners(result.data);
+          const category = result.data.find((c) => c.name === "Partners");
+          if (category) await fetchCards(category.id);
         }
       } catch (error) {
-        console.error("Error fetching base cards:", error);
+        console.error("Error fetching partners:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBaseCategories();
+    load();
   }, []);
 
-  // GSAP ScrollTrigger animations
-  useEffect(() => {
-    if (!isLoading && partners.length > 0) {
-      const ctx = gsap.context(() => {
-        // Set initial states
-        // Header elements (icon, subtitle, title) start from top (-100px) and invisible
-        gsap.set([iconRef.current, subtitleRef.current, titleRef.current], {
-          y: -100,
-          opacity: 0,
-        });
+  /* ---------- one scroll moment: headline rises, logo tiles open from their centre (plays once) ---------- */
+  useIsoLayoutEffect(() => {
+    if (isLoading || partners.length === 0 || prefersReducedMotion()) return;
 
-        // Swiper container starts from left (-100px) and invisible
-        gsap.set(swiperRef.current, {
-          x: -100,
-          opacity: 0,
-        });
-
-        // Individual cards start invisible and scaled down
-        gsap.set(cardRefs.current, {
-          opacity: 0,
-          scale: 0.8,
-          y: 50,
-        });
-
-        // Create timeline for sequential animations
-        const tl = gsap.timeline({
+    const ctx = gsap.context(() => {
+      gsap
+        .timeline({
           scrollTrigger: {
-            trigger: containerRef.current,
-            start: "top 80%",
-            end: "bottom 20%",
-            toggleActions: "play none none reverse",
-            // markers: true,
+            trigger: rootRef.current,
+            start: "top 70%",
+            once: true,
           },
-        });
-
-        // Icon animation - falls from top
-        tl.to(iconRef.current, {
-          duration: 0.35,
-          y: 0,
-          opacity: 1,
-          ease: "power2.out",
-        });
-
-        // Subtitle animation - falls from top
-        tl.to(
-          subtitleRef.current,
+        })
+        .from("[data-fade]", {
+          y: 16,
+          opacity: 0,
+          duration: 0.7,
+          ease: "power3.out",
+        })
+        .fromTo(
+          "[data-word]",
+          { yPercent: 115 },
+          { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.06 },
+          "-=0.4",
+        )
+        .fromTo(
+          "[data-tile]",
+          { clipPath: "inset(50% 50% 50% 50% round 28px)" },
           {
-            duration: 0.35,
-            y: 0,
-            opacity: 1,
-            delay: 0.5,
-            ease: "power2.out",
+            clipPath: "inset(0% 0% 0% 0% round 28px)",
+            duration: 0.9,
+            ease: "expo.out",
+            stagger: { each: 0.06, from: "start" },
           },
-          "-=0.5"
+          "-=0.5",
         );
+    }, rootRef);
 
-        // Title animation - falls from top
-        tl.to(
-          titleRef.current,
-          {
-            duration: 0.35,
-            y: 0,
-            opacity: 1,
-            delay: 0.5,
-            ease: "power2.out",
-          },
-          "-=0.5"
-        );
-
-        // Swiper container animation - slides from left
-        tl.to(
-          swiperRef.current,
-          {
-            duration: 0.5,
-            x: 0,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.3"
-        );
-
-        // Individual cards animation - staggered appearance
-        tl.to(
-          cardRefs.current,
-          {
-            duration: 0.25,
-            opacity: 1,
-            scale: 1,
-            y: 0,
-            ease: "back.out(1.7)",
-            stagger: {
-              amount: 1, // Total time to stagger all cards
-              from: "start", // Start from first card
-            },
-          },
-          "-=0.5"
-        );
-      }, containerRef);
-
-      return () => ctx.revert();
-    }
+    return () => ctx.revert();
   }, [isLoading, partners]);
 
+  /* ---------- states ---------- */
   if (isLoading) {
     return (
-      <div className="container mt-8 mx-auto flex flex-col justify-center items-center lg:flex-col lg:justify-center lg:items-center w-full lg:h-[700px] h-auto p-5">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading partners...</p>
+      <section
+        aria-busy="true"
+        className="px-5 py-20 md:px-10 lg:px-16 lg:py-28"
+        style={{ background: BONE }}
+      >
+        <div className="mx-auto max-w-[1450px] animate-pulse">
+          <div className="h-10 w-48 rounded-full bg-[#1F4D36]/10" />
+          <div className="mt-6 h-14 w-full max-w-xl rounded-lg bg-[#1F4D36]/10" />
+          <div className="mt-14 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className="h-[180px] rounded-[28px] bg-[#1F4D36]/10"
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
+  if (partners.length === 0) return null;
+
   return (
-    <div
-      ref={containerRef}
-      className="container mt-8 mx-auto flex flex-col justify-center items-center lg:flex-col lg:justify-center lg:items-center w-full lg:h-[700px] h-auto p-5"
+    <section
+      ref={rootRef}
+      aria-label="Partners and investors"
+      className={`${display.className} px-5 py-20 text-[#07140F] md:px-10 lg:px-16 lg:py-28`}
+      style={{ background: BONE }}
     >
-      <div className="flex-1 flex flex-col justify-center items-center max-w-4xl text-center w-full mb-2">
-        <div ref={iconRef}>
-          <GiBullHorns className="lg:w-auto w-full text-2xl text-start text-green-700 mb-2" />
+      <div className="mx-auto max-w-[1450px]">
+        {/* ---------- Header ---------- */}
+        <div data-fade className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+            <GiBullHorns className="text-xl" aria-hidden />
+          </span>
+          <span className="text-base font-medium text-[#1F4D36]">
+            Association
+          </span>
         </div>
 
-        <h2
-          ref={subtitleRef}
-          className="text-xl font-bold text-[#687469] text-start mb-2 md:mb-4"
-        >
-          Association
+        <h2 className="mt-6 text-[clamp(2.25rem,4.6vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.03em] text-left">
+          {"Partners & investors".split(" ").map((word, i) => (
+            <span
+              key={i}
+              className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom"
+            >
+              <span data-word className="inline-block will-change-transform">
+                {word}
+              </span>
+            </span>
+          ))}
         </h2>
 
-        <h1
-          ref={titleRef}
-          className="lg:text-5xl text-2xl min-w-[150px] font-bold text-[#334b35] text-start mb-6"
-        >
-          Partners & Investors
-        </h1>
-      </div>
+        {/* ---------- Logo wall: static, so every partner is always visible ---------- */}
+        <ul className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:mt-16 lg:grid-cols-4 xl:grid-cols-5">
+          {partners.map((partner) => {
+            const url = partner.extra_data?.url;
+            const tile = (
+              <>
+                <div className="relative h-[90px] w-full lg:h-[110px]">
+                  <Image
+                    src={partner.image_url || "/placeholder.svg"}
+                    alt={partner.name}
+                    fill
+                    sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 22vw, (min-width: 640px) 30vw, 45vw"
+                    className="object-contain"
+                  />
+                </div>
 
-      <div ref={swiperRef} className="w-full mb-20">
-        <Swiper
-          breakpoints={{
-            640: { slidesPerView: 1 },
-            768: { slidesPerView: 2 },
-            1024: { slidesPerView: 3 },
-            1280: { slidesPerView: 4 },
-          }}
-          spaceBetween={50}
-          loop={true}
-          pagination={{ clickable: false }}
-          autoplay={{ delay: 3000, disableOnInteraction: true }}
-          modules={[Navigation, Autoplay]}
-          className="flex-1 w-full lg:h-auto flex justify-center items-center lg:justify-center lg:items-center"
-        >
-          {partners.map((partner, index) => (
-            <SwiperSlide key={partner.id}>
-              <div
-                ref={(el) => {cardRefs.current[index] = el}}
-                className="relative flex justify-center items-center h-[200px] lg:w-auto lg:h-[300px] cursor-pointer group rounded-md bg-white shadow-lg overflow-hidden"
-              >
-                <Link href={partner.extra_data.url} passHref>
-                  <div className="w-full h-full">
-                    <Image
-                      src={partner.image_url || "/placeholder.svg"}
-                      alt={partner.name}
-                      className="rounded-md object-contain w-full h-full"
-                      width={300}
-                      height={300}
-                      priority
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity duration-300 rounded-md flex justify-center items-center">
-                      <span className="text-white text-4xl opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        +
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            </SwiperSlide>
-          ))}
-        </Swiper>
+                {url && (
+                  <span
+                    aria-hidden
+                    className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F] opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-0"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M4 12 12 4m0 0H6m6 0v6"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                )}
+              </>
+            );
+
+            const tileClass =
+              "group relative flex h-[170px] items-center justify-center rounded-[28px] border border-[#07140F]/10 bg-[#F8FAF3] p-6 transition-colors duration-300 lg:h-[200px] lg:p-8";
+
+            return (
+              <li key={partner.id} data-tile>
+                {url ? (
+                  <Link
+                    href={url}
+                    target={isExternal(url) ? "_blank" : undefined}
+                    rel={isExternal(url) ? "noopener noreferrer" : undefined}
+                    aria-label={partner.name}
+                    className={`${tileClass} hover:border-[#1F4D36]/40 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1F4D36]`}
+                  >
+                    {tile}
+                  </Link>
+                ) : (
+                  <div className={tileClass}>{tile}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </div>
-    </div>
+    </section>
   );
 };
 

@@ -1,20 +1,27 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
+
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Autoplay, Navigation } from "swiper/modules";
-import { GiBullHorns } from "react-icons/gi";
 import Link from "next/link";
-import gsap from "gsap";
-import ScrollTrigger from "gsap/ScrollTrigger";
-// import BackgroundImageLayer from "../common/BackgroundImageLayer";
+import { GiBullHorns } from "react-icons/gi";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Bricolage_Grotesque } from "next/font/google";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
+
+/* Palette (same as the rest of the site)
+   pine #07140F · moss #1F4D36 · bone #EEF2E6 · tag (amber) #F2B84B
+   BONE = page background around the panel; PINE = the panel colour.
+   Keep both equal to the other files. */
+const BONE = "#EEF2E6";
+const PINE = "#07140F";
+
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface BaseCategory {
   id: string;
@@ -52,314 +59,188 @@ interface BaseCardApiResponse {
   data: BaseCard[];
 }
 
-const AwardRecognitionSection = () => {
-  const [partners, setPartners] = useState<BaseCard[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const iconRef = useRef<HTMLDivElement>(null);
-  const subtitleRef = useRef<HTMLHeadingElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const swiperRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+const isExternal = (url: string) => /^https?:\/\//i.test(url);
+
+const AwardRecognitionSection = () => {
+  const [awards, setAwards] = useState<BaseCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const rootRef = useRef<HTMLElement>(null);
+
+  /* ---------- data ---------- */
   useEffect(() => {
-    const fetchBaseCategories = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-categories/`
-        );
-        const result: BaseCategoryApiResponse = await response.json();
-        if (result.status === "success") {
-          const partnersCategory = result.data.find(
-            (category) => category.name === "Award"
-          );
-          if (partnersCategory) {
-            fetchBaseCards(partnersCategory.id);
-          } else {
-            setIsLoading(false);
-          }
-        } else {
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Error fetching base categories:", error);
-        setIsLoading(false);
-      }
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    const fetchCards = async (categoryId: string) => {
+      const res = await fetch(`${base}/base-category/${categoryId}/base-cards/`);
+      const result: BaseCardApiResponse = await res.json();
+      if (result.status === "success") setAwards(result.data);
     };
 
-    const fetchBaseCards = async (categoryId: string) => {
+    const load = async () => {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/base-category/${categoryId}/base-cards/`
-        );
-        const result: BaseCardApiResponse = await response.json();
+        const res = await fetch(`${base}/base-categories/`);
+        const result: BaseCategoryApiResponse = await res.json();
         if (result.status === "success") {
-          setPartners(result.data);
+          const category = result.data.find((c) => c.name === "Award");
+          if (category) await fetchCards(category.id);
         }
       } catch (error) {
-        console.error("Error fetching base cards:", error);
+        console.error("Error fetching awards:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBaseCategories();
+    load();
   }, []);
 
-  useEffect(() => {
-    if (!isLoading && partners.length > 0) {
-      const ctx = gsap.context(() => {
-        // Set initial states
-        // Header elements (icon, subtitle, title) start from top (-100px) and invisible
-        gsap.set([iconRef.current, subtitleRef.current, titleRef.current], {
-          y: -100,
-          opacity: 0,
-        });
+  /* ---------- one scroll moment: headline rises, cards unfold upward in turn (plays once) ---------- */
+  useIsoLayoutEffect(() => {
+    if (isLoading || awards.length === 0 || prefersReducedMotion()) return;
 
-        // Swiper container starts from left (-100px) and invisible
-        gsap.set(swiperRef.current, {
-          x: -100,
-          opacity: 0,
-        });
-
-        // Individual cards start invisible and scaled down
-        gsap.set(cardRefs.current, {
-          opacity: 0,
-          scale: 0.1,
-          y: 50,
-        });
-
-        // Create timeline for sequential animations
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: containerRef.current,
-            start: "top 80%",
-            end: "bottom 20%",
-            toggleActions: "play none none reverse",
-            // markers: true,
-          },
-        });
-
-        // Icon animation - falls from top
-        tl.to(iconRef.current, {
-          duration: 0.35,
-          y: 0,
-          opacity: 1,
-          ease: "power2.out",
-        });
-
-        // Subtitle animation - falls from top
-        tl.to(
-          subtitleRef.current,
-          {
-            duration: 0.35,
-            y: 0,
-            delay: 0.5,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.5"
+    const ctx = gsap.context(() => {
+      gsap
+        .timeline({ scrollTrigger: { trigger: rootRef.current, start: "top 70%", once: true } })
+        .from("[data-fade]", { y: 16, opacity: 0, duration: 0.7, ease: "power3.out" })
+        .fromTo(
+          "[data-word]",
+          { yPercent: 115 },
+          { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.06 },
+          "-=0.4"
+        )
+        .fromTo(
+          "[data-card]",
+          { clipPath: "inset(100% 0% 0% 0% round 28px)" },
+          { clipPath: "inset(0% 0% 0% 0% round 28px)", duration: 1.1, ease: "expo.inOut", stagger: 0.1 },
+          "-=0.6"
         );
+    }, rootRef);
 
-        // Title animation - falls from top
-        tl.to(
-          titleRef.current,
-          {
-            duration: 0.35,
-            y: 0,
-            delay: 0.5,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.5"
-        );
+    return () => ctx.revert();
+  }, [isLoading, awards]);
 
-        // Swiper container animation - slides from left
-        tl.to(
-          swiperRef.current,
-          {
-            duration: 0.35,
-            x: 0,
-            opacity: 1,
-            ease: "power2.out",
-          },
-          "-=0.3"
-        );
-
-        // Individual cards animation - staggered appearance
-        tl.to(
-          cardRefs.current,
-          {
-            duration: 0.25,
-            opacity: 1,
-            scale: 1,
-            y: 0,
-            ease: "back.out(1.7)",
-            stagger: {
-              amount: 1, // Total time to stagger all cards
-              from: "start", // Start from first card
-            },
-          },
-          "-=0.5"
-        );
-      }, containerRef);
-
-      return () => ctx.revert();
-    }
-  }, [isLoading, partners]);
-
+  /* ---------- states ---------- */
   if (isLoading) {
     return (
-      <div className="flex flex-col mt-10 justify-center items-center lg:flex-col lg:justify-center lg:items-center w-full lg:h-[600px] h-auto p-5">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading awards...</p>
+      <section aria-busy="true" className="p-2 sm:p-3 lg:p-4" style={{ background: BONE }}>
+        <div
+          className="animate-pulse rounded-[28px] px-5 py-16 md:px-10 lg:px-16 lg:py-24"
+          style={{ background: PINE }}
+        >
+          <div className="mx-auto max-w-[1450px]">
+            <div className="h-12 w-80 rounded-lg bg-white/10" />
+            <div className="mt-12 grid gap-4 md:grid-cols-3">
+              {[0, 1, 2].map((n) => (
+                <div key={n} className="h-[460px] rounded-[28px] bg-white/10" />
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
+  if (awards.length === 0) return null;
+
   return (
-    <div
-      ref={containerRef}
-      className="relative flex flex-col mt-10 justify-center items-center lg:flex-col lg:justify-center lg:items-center w-full lg:h-[600px] h-auto p-5"
+    <section
+      ref={rootRef}
+      aria-label="Awards and recognitions"
+      className={`${display.className} p-2 sm:p-3 lg:p-4`}
+      style={{ background: BONE }}
     >
-      {/* <BackgroundImageLayer imageUrl="/farm.png" size="80%" position="bottom"/> */}
-      <div className="flex-1 flex flex-col justify-center items-center max-w-4xl text-center w-full max-[1023px]:mb-5">
-        <div ref={iconRef}>
-          <GiBullHorns className="lg:w-auto w-full text-2xl text-start text-green-700 mb-2" />
-        </div>
-        <h2
-          ref={subtitleRef}
-          className="text-xl font-bold text-[#687469] text-start mb-3"
-        >
-          achivements
-        </h2>
-        <h1
-          ref={titleRef}
-          className="lg:text-5xl text-2xl min-w-[150px] font-bold text-[#334b35] text-start"
-        >
-          Awards & Recognitions
-        </h1>
-      </div>
-      <div ref={swiperRef} className="w-[98%]">
-        <Swiper
-          breakpoints={{
-            640: { slidesPerView: 1 },
-            768: { slidesPerView: 2 },
-            1024: { slidesPerView: 3 },
-            1280: { slidesPerView: 4 },
-          }}
-          spaceBetween={200}
-          loop={true}
-          pagination={{ clickable: false }}
-          autoplay={{ delay: 1500, disableOnInteraction: false }}
-          modules={[Navigation, Autoplay]}
-          className="flex-1 w-full lg:h-auto flex justify-center items-center lg:justify-center lg:items-center "
-        >
-          {partners.map((partner, index) => (
-            <SwiperSlide key={partner.id}>
-              <div
-                key={index}
-                ref={(el) => {
-                  cardRefs.current[index] = el;
-                }}
-                className="relative w-[350px] flex-col h-auto justify-center items-center group bg-gray-800 rounded-lg transform transition-transform duration-300 hover:scale-105"
-              >
-                {/*<Link href={partner.extra_data.url} passHref>
-                  <div className="relative flex justify-center items-center w-[300px] h-[250px] cursor-pointer group rounded-md bg-[#F6F4EC] bg-transparent">
-                    <Image
-                      src={partner.image_url}
-                      alt={partner.name}
-                      className="rounded-md object-fit"
-                      width={300}
-                      height={300}
-                      priority
-                    />
-                     // <Link href={partner.extra_data.url} className='absolute  bottom-0 left-0 right-0 z-50 mx-5 overflow-hidden group-hover:overflow-visible'/>
-                    <div className="absolute inset-0 bg-black bg-opacity-10 group-hover:bg-opacity-50 transition-opacity duration-300 rounded-md flex flex-col justify-center items-center">
-                      {partner.extra_data.event && (
-                        <p className="text-white text-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          {partner.extra_data.event}
-                        </p>
-                      )}
-                      {partner.extra_data.status && (
-                        <p className="text-white text-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          {partner.extra_data.status}
-                        </p>
-                      )}
-                      {partner.extra_data.prize && (
-                        <p className="text-white text-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          {partner.extra_data.prize}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Link> */}
-                <div className="relative h-[300px] rounded-lg bg-black overflow-hidden">
-                  <div className="absolute h-auto rounded-lg inset-0 bg-contain left-0 group-hover:-left-5 transition-all duration-700">
-                    <Image
-                      src={partner.image_url || "/placeholder.svg"}
-                      alt={partner.name}
-                      fill
-                      className="rounded-lg object-cover object-center"
-                      priority
-                    />
-                    <div className="absolute rounded-lg bg-green-300 bg-opacity-20 top-[-100%] z-30 right-0 w-full h-full group-hover:top-0 transition-all duration-700 ease-in-out overflow-hidden"></div>
-                  </div>
-                </div>
+      <div
+        className="rounded-[28px] px-5 py-16 text-[#EEF2E6] md:px-10 lg:px-16 lg:py-24"
+        style={{ background: PINE }}
+      >
+        <div className="mx-auto max-w-[1450px]">
+          {/* ---------- Header ---------- */}
+          <div data-fade className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+              <GiBullHorns className="text-xl" aria-hidden />
+            </span>
+            <span className="text-base font-medium text-[#EEF2E6]/70">Achievements</span>
+          </div>
 
-                <Link
-                  href={partner.extra_data.url}
-                  className="absolute bottom-0 left-0 right-0 z-50 mx-5 overflow-hidden group-hover:overflow-visible"
+          <h2 className="mt-6 text-[clamp(2.25rem,4.6vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.03em] text-left">
+            {"Awards & recognitions".split(" ").map((word, i) => (
+              <span key={i} className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom">
+                <span data-word className="inline-block will-change-transform">
+                  {word}
+                </span>
+              </span>
+            ))}
+          </h2>
+
+          {/* ---------- Awards: details are always visible (no hover needed) ---------- */}
+          <ul className="mt-12 grid grid-cols-[repeat(auto-fit,minmax(min(100%,270px),1fr))] gap-4 lg:mt-16 lg:gap-5">
+            {awards.map((award) => {
+              const { status, event, prize, url } = award.extra_data ?? ({} as Partial<ExtraData>);
+              return (
+                <li
+                  key={award.id}
+                  data-card
+                  className="group relative flex flex-col rounded-[28px] border border-white/10 bg-white/[0.06] p-3"
                 >
-                  <div className="relative [transform:rotateX(120deg)] z-20 flex flex-col h-[80px] justify-center items-center rounded-t-lg font-bold text-white opacity-0 group-hover:opacity-100 group-hover:[transform:rotateX(0deg)] transition-all duration-700">
-                    <div className="w-full flex flex-col justify-center bg-green-800 items-center h-full rounded-tr-lg">
-                      <div className="text-center mb-4">
-                        {partner.extra_data.status || partner.name}
-                      </div>
-                    </div>
+                  <div className="relative h-[280px] overflow-hidden rounded-[20px] bg-white/5">
+                    <Image
+                      src={award.image_url || "/placeholder.svg"}
+                      alt={award.name}
+                      fill
+                      sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 100vw"
+                      className="object-cover object-center transition-transform duration-[1200ms] ease-out group-hover:scale-105 motion-reduce:transition-none"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#07140F]/50 via-transparent to-transparent" />
 
-                    <div className="absolute left-0 top-[-32px] rounded-t-md">
-                      <div className="bg-yellow-600 text-xs p-2 text-center text-black rounded-t-md">
-                        {partner.extra_data.event || partner.name}
-                      </div>
-                    </div>
-                    {partner.extra_data.prize ? (
-                      <div className="absolute center-0 bottom-[1px] rounded-t-md">
-                        <div className="bg-green-700 text-xs p-2 text-center text-white rounded-t-md">
-                          {partner.extra_data.prize}
-                        </div>
-                      </div>
-                    ) : (
-                      <div></div>
+                    {status && (
+                      <span className="absolute left-3 top-3 rounded-full bg-[#F2B84B] px-3.5 py-1.5 text-sm font-medium text-[#07140F]">
+                        {status}
+                      </span>
+                    )}
+
+                    {url && (
+                      <span
+                        aria-hidden
+                        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-[#07140F]/40 text-[#EEF2E6] opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M4 12 12 4m0 0H6m6 0v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
                     )}
                   </div>
-                </Link>
-              </div>
-            </SwiperSlide>
-          ))}
-        </Swiper>
 
-        {/* {selectedImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-          <div className="relative max-w-3xl max-h-3xl w-full h-full p-4">
-            <button className="absolute top-2 right-2 text-white text-2xl" onClick={closeOverlay}>×</button>
-            <Image
-              src={selectedImage}
-              alt="Selected"
-              objectFit='contain'
-              className="rounded-md"
-              layout="responsive"
-              width={800}
-              height={600}
-              unoptimized // Add this line to bypass Next.js image optimization
-            />
-          </div>
+                  <div className="flex flex-1 flex-col px-3 pb-3 pt-5">
+                    <h3 className="text-xl font-bold leading-tight tracking-[-0.01em]">{award.name}</h3>
+                    {event && <p className="mt-2 text-base leading-snug text-[#EEF2E6]/70">{event}</p>}
+                    {prize && (
+                      <p className="mt-4 inline-flex items-center gap-2 self-start rounded-full border border-white/15 px-3.5 py-1.5 text-sm text-[#EEF2E6]">
+                        <span aria-hidden className="h-2 w-2 rounded-full bg-[#F2B84B]" />
+                        {prize}
+                      </p>
+                    )}
+                  </div>
+
+                  {url && (
+                    <Link
+                      href={url}
+                      target={isExternal(url) ? "_blank" : undefined}
+                      rel={isExternal(url) ? "noopener noreferrer" : undefined}
+                      aria-label={`Read more: ${award.name}`}
+                      className="absolute inset-0 z-10 rounded-[28px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F2B84B]"
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
-      )} */}
       </div>
-    </div>
+    </section>
   );
 };
 

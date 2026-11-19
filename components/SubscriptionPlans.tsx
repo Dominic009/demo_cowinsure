@@ -1,14 +1,28 @@
 "use client";
 
-import React from "react";
-import {
-  MessageCircle,
-  Check,
-  Crown,
-  Zap,
-  Rocket,
-  Building2,
-} from "lucide-react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
+import { Check, Crown, Zap, Rocket, Building2 } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
+import { GiBullHorns } from "react-icons/gi";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Bricolage_Grotesque } from "next/font/google";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
+
+/* Palette (same as the rest of the site)
+   pine #07140F · moss #1F4D36 · bone #EEF2E6 · tag (amber) #F2B84B
+   BONE is the section background and the colour of the carved CTA notch. */
+const BONE = "#EEF2E6";
+const NOTCH = 24;
+const WHATSAPP_NUMBER = "8801999467873";
+
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface SubscriptionPlan {
   name: string;
@@ -20,7 +34,6 @@ interface SubscriptionPlan {
     excluded: string[];
   };
   popular?: boolean;
-  color: string;
 }
 
 const subscriptionPlans: SubscriptionPlan[] = [
@@ -28,8 +41,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
     name: "Starter",
     price: "99 tk",
     description: "Perfect for small farm owners",
-    icon: <Zap className="w-5 h-5" />,
-    color: "bg-amber-500",
+    icon: <Zap className="h-5 w-5" aria-hidden />,
     features: {
       included: [
         "Livestock Inventory",
@@ -52,8 +64,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
     name: "Plus",
     price: "199 tk",
     description: "Ideal for growing farm owners",
-    icon: <Rocket className="w-5 h-5" />,
-    color: "bg-emerald-500",
+    icon: <Rocket className="h-5 w-5" aria-hidden />,
     popular: true,
     features: {
       included: [
@@ -78,8 +89,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
     name: "Pro",
     price: "299 tk",
     description: "Complete solution for farm owners",
-    icon: <Crown className="w-5 h-5" />,
-    color: "bg-violet-500",
+    icon: <Crown className="h-5 w-5" aria-hidden />,
     features: {
       included: [
         "Everything in Plus",
@@ -98,8 +108,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
     name: "Enterprise",
     price: "Custom",
     description: "Tailored solutions for enterprise",
-    icon: <Building2 className="w-5 h-5" />,
-    color: "bg-slate-700",
+    icon: <Building2 className="h-5 w-5" aria-hidden />,
     features: {
       included: [
         "Everything in Pro",
@@ -116,129 +125,256 @@ const subscriptionPlans: SubscriptionPlan[] = [
   },
 ];
 
-export default function SubscriptionPlans() {
-  // const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const handleWhatsAppClick = (planName: string) => {
-    const message = `Hello, I'm interested in the ${planName} subscription plan. Can you provide more details?`;
-    const whatsappUrl = `https://wa.me/8801999467873?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, "_blank");
-  };
+// Concave joins for the CTA notch in each card's bottom-right corner
+const fillet: React.CSSProperties = {
+  width: NOTCH,
+  height: NOTCH,
+  background: `radial-gradient(circle at 0 0, transparent ${NOTCH}px, ${BONE} ${NOTCH + 0.5}px)`,
+};
+
+const whatsappUrl = (planName: string) =>
+  `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+    `Hello, I'm interested in the ${planName} subscription plan. Can you provide more details?`,
+  )}`;
+
+export default function SubscriptionPlans() {
+  const rootRef = useRef<HTMLElement>(null);
+
+  /* One scroll moment: headline rises, then the cards unroll downward in turn (plays once) */
+  useIsoLayoutEffect(() => {
+    if (prefersReducedMotion()) return;
+
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: rootRef.current,
+          start: "top 70%",
+          once: true,
+        },
+      });
+
+      tl.fromTo(
+        "[data-word]",
+        { yPercent: 115 },
+        { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.06 },
+      )
+        .from(
+          "[data-fade]",
+          {
+            y: 16,
+            opacity: 0,
+            duration: 0.8,
+            ease: "power3.out",
+            stagger: 0.1,
+          },
+          "-=0.6",
+        )
+        .fromTo(
+          "[data-plan]",
+          { clipPath: "inset(0% 0% 100% 0% round 28px)" },
+          {
+            clipPath: "inset(0% 0% 0% 0% round 28px)",
+            duration: 1.1,
+            ease: "expo.inOut",
+            stagger: 0.12,
+          },
+          "-=0.6",
+        );
+    }, rootRef);
+
+    return () => ctx.revert();
+  }, []);
 
   return (
-    <section className="py-24 bg-[#F8FAFC]" id="subscription">
-      <div className="max-w-[1500px] mx-auto px-6 lg:px-8">
-        {/* Header Section */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-4xl md:text-5xl font-extrabold text-[#334b35] tracking-tight mb-6">
-            Simple, transparent{" "}
-            <span className="text-emerald-600">pricing</span>
-          </h2>
-          <p className="text-lg text-[#687469] leading-relaxed">
-            Choose the perfect plan for your farm management needs. Scale
-            seamlessly as your business grows, with no hidden fees.
+    <section
+      id="subscription"
+      ref={rootRef}
+      aria-label="Pricing"
+      className={`${display.className} px-5 py-20 text-[#07140F] md:px-10 lg:px-16 lg:py-28`}
+      style={{ background: BONE }}
+    >
+      <div className="mx-auto max-w-[1450px]">
+        {/* ---------- Header ---------- */}
+        <div className="grid items-end gap-6 lg:grid-cols-[1fr_auto] lg:gap-16">
+          <div>
+            <div data-fade className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F2B84B] text-[#07140F]">
+                <GiBullHorns className="text-xl" aria-hidden />
+              </span>
+              <span className="text-base font-medium text-[#1F4D36]">
+                Pricing
+              </span>
+            </div>
+
+            <h2 className="mt-6 max-w-3xl text-[clamp(2.25rem,4.6vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.03em] text-left">
+              {"Simple, transparent pricing".split(" ").map((word, i) => (
+                <span
+                  key={i}
+                  className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom"
+                >
+                  <span
+                    data-word
+                    className="inline-block will-change-transform"
+                  >
+                    {word}
+                  </span>
+                </span>
+              ))}
+            </h2>
+          </div>
+
+          <p
+            data-fade
+            className="max-w-[38ch] text-lg leading-relaxed text-[#07140F]/70"
+          >
+            Pick the plan that fits your herd. Move up whenever your farm grows,
+            with no hidden fees.
           </p>
         </div>
 
-        {/* Pricing Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {subscriptionPlans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`relative flex flex-col rounded-3xl bg-white border transition-all duration-300 ease-out
-        ${
-          plan.popular
-            ? "border-emerald-500 shadow-2xl shadow-emerald-900/10 scale-105 z-10"
-            : "border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1"
-        }
-      `}
-            >
-              {/* Popular Badge */}
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                  <span className="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg ring-1 ring-emerald-600/20">
-                    Most Popular
-                  </span>
-                </div>
-              )}
+        {/* ---------- Plans ---------- */}
+        <div className="mt-14 grid gap-4 md:grid-cols-2 xl:mt-20 xl:grid-cols-4 xl:gap-5">
+          {subscriptionPlans.map((plan) => {
+            const [amount, unit] = plan.price.split(" ");
+            const isCustom = plan.price === "Custom";
+            const pop = !!plan.popular;
 
-              {/* Card Header */}
-              <div className="p-6 pb-0">
-                {/* Icon and Title Row */}
-                <div className="flex items-start gap-3 mb-4">
-                  <div
-                    className={`inline-flex items-center justify-center w-12 h-12 rounded-2xl ${plan.color} text-white shadow-lg shadow-slate-200 flex-shrink-0`}
+            return (
+              <article
+                key={plan.name}
+                data-plan
+                className={`relative flex flex-col rounded-[28px] p-6 pb-28 xl:p-7 xl:pb-28 ${
+                  pop
+                    ? " bg-[#07140F] text-[#EEF2E6] xl:-my-4"
+                    : " bg-[#F8FAF3]"
+                }`}
+              >
+                {/* Name row */}
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+                      pop
+                        ? "bg-[#F2B84B] text-[#07140F]"
+                        : "bg-[#1F4D36] text-[#EEF2E6]"
+                    }`}
                   >
                     {plan.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-bold text-[#334b35] leading-tight text-left">
-                      {plan.name}
-                    </h3>
-                    <p className="text-xs text-[#687469] leading-relaxed text-left">
-                      {plan.description}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Price Row */}
-                <div className="mt-4 flex items-center justify-between gap-2">
-                  <span className="text-sm text-[#687469] font-medium">
-                    MONTHLY
                   </span>
-                  <div>
-                    <span className="text-4xl font-bold tracking-tight text-[#334b35]">
-                      {plan.price}
+                  <h3 className="text-xl font-bold tracking-[-0.01em]">
+                    {plan.name}
+                  </h3>
+                  {pop && (
+                    <span className="ml-auto rounded-full bg-[#F2B84B] px-3 py-1 text-sm font-medium text-[#07140F]">
+                      Most popular
                     </span>
-                    {plan.price !== "Custom" && (
-                      <small className="text-xs font-medium text-[#687469]">
-                        {" "} /cattle
-                      </small>
-                    )}
-                  </div>
+                  )}
                 </div>
-              </div>
 
-              {/* Divider */}
-              <div className="h-px bg-slate-100 my-6 mx-6" />
+                <p
+                  className={`mt-4 text-[15px] ${pop ? "text-[#EEF2E6]/70" : "text-[#07140F]/65"}`}
+                >
+                  {plan.description}
+                </p>
 
-              {/* Features List */}
-              <div className="px-6 flex-1">
+                {/* Price */}
+                <div className="mt-8">
+                  <p className="flex items-baseline gap-1.5">
+                    <span className="text-5xl font-bold leading-none tracking-[-0.03em]">
+                      {amount}
+                    </span>
+                    {unit && (
+                      <span className="text-xl font-medium opacity-70">
+                        {unit}
+                      </span>
+                    )}
+                  </p>
+                  <p
+                    className={`mt-2 text-sm ${pop ? "text-[#EEF2E6]/60" : "text-[#07140F]/55"}`}
+                  >
+                    {isCustom
+                      ? "Talk to us for a quote"
+                      : "per cattle, billed monthly"}
+                  </p>
+                </div>
+
+                <div
+                  className={`my-6 h-px ${pop ? "bg-white/15" : "bg-[#07140F]/10"}`}
+                />
+
+                {/* Included features */}
                 <ul className="space-y-3">
-                  {plan.features.included.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <div className="mt-0.5 flex-shrink-0">
+                  {plan.features.included.map((feature, i) => (
+                    <li key={feature} className="flex items-start gap-3">
+                      <span
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                          pop
+                            ? "bg-white/10 text-[#F2B84B]"
+                            : "bg-[#1F4D36]/10 text-[#1F4D36]"
+                        }`}
+                      >
                         <Check
-                          className="w-5 h-5 text-emerald-600"
-                          strokeWidth={2.5}
+                          className="h-3 w-3"
+                          strokeWidth={3}
+                          aria-hidden
                         />
-                      </div>
-                      <span className="text-sm font-medium text-[#687469] leading-relaxed">
+                      </span>
+                      <span
+                        className={`text-[15px] leading-snug ${i === 0 && feature.startsWith("Everything") ? "font-semibold" : ""} ${
+                          pop ? "text-[#EEF2E6]/85" : "text-[#07140F]/75"
+                        }`}
+                      >
                         {feature}
                       </span>
                     </li>
                   ))}
                 </ul>
-              </div>
 
-              {/* Footer / CTA */}
-              <div className="p-6 pt-6 mt-auto">
-                <button
-                  onClick={() => handleWhatsAppClick(plan.name)}
-                  className={`group w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-semibold transition-all duration-200 
-            ${
-              plan.popular
-                ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200"
-                : "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-lg"
-            }
-          `}
+                {/* CTA notch: carved into the corner, same device as the rest of the site */}
+                <div
+                  className="absolute bottom-0 right-0 rounded-tl-[24px] p-3"
+                  style={{ background: BONE }}
                 >
-                  <MessageCircle className="w-4 h-4 transition-transform group-hover:scale-110" />
-                  <span>Get via WhatsApp</span>
-                </button>
-              </div>
-            </div>
-          ))}
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute bottom-0 right-full"
+                    style={fillet}
+                  />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute bottom-full right-0"
+                    style={fillet}
+                  />
+
+                  <a
+                    href={whatsappUrl(plan.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Get the ${plan.name} plan via WhatsApp`}
+                    className={`group inline-flex items-center gap-3 rounded-full py-1.5 pl-5 pr-1.5 text-[15px] font-medium transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F2B84B] ${
+                      pop
+                        ? "bg-[#F2B84B] text-[#07140F] hover:bg-[#07140F] hover:text-[#EEF2E6]"
+                        : "bg-[#07140F] text-[#EEF2E6] hover:bg-[#1F4D36]"
+                    }`}
+                  >
+                    Get started
+                    <span
+                      className={`flex h-10 w-10 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-105 ${
+                        pop
+                          ? "bg-[#07140F] text-[#F2B84B]"
+                          : "bg-[#F2B84B] text-[#07140F]"
+                      }`}
+                    >
+                      <FaWhatsapp size={20} aria-hidden />
+                    </span>
+                  </a>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>
