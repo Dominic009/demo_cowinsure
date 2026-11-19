@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 import HerosSectionCommon from "@/components/common/HerosSectionCommon";
-import ServiceHighlighted from "@/components/common/ServiceHighlighted";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Bricolage_Grotesque } from "next/font/google";
@@ -15,8 +14,8 @@ const display = Bricolage_Grotesque({ subsets: ["latin"], display: "swap" });
 
 const BONE = "#EEF2E6";
 const PINE = "#07140F";
-const MOSS = "#1F4D36";
-const TAG = "#F2B84B";
+// const MOSS = "#1F4D36";
+// const TAG = "#F2B84B";
 const FRAME_NOTCH = 28;
 const CARD_NOTCH = 24;
 
