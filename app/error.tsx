@@ -110,7 +110,10 @@ export default function Error({ error, reset }: ErrorProps) {
             className="text-[clamp(2.5rem,6vw,4.5rem)] font-bold leading-[1.02] tracking-[-0.03em]"
           >
             {"Something went wrong".split(" ").map((word, i) => (
-              <span key={i} className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom">
+              <span
+                key={i}
+                className="mr-[0.22em] inline-block overflow-hidden pb-[0.12em] align-bottom"
+              >
                 <span data-word className="inline-block will-change-transform">
                   {word}
                 </span>
@@ -122,11 +125,14 @@ export default function Error({ error, reset }: ErrorProps) {
             data-fade
             className="mt-6 max-w-[42ch] text-base leading-relaxed text-[#EEF2E6]/70 lg:text-lg"
           >
-            We couldn&apos;t load this page. It might be a temporary issue or the page
-            doesn&apos;t exist.
+            We couldn&apos;t load this page. It might be a temporary issue or
+            the page doesn&apos;t exist.
           </p>
 
-          <div data-fade className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
+          <div
+            data-fade
+            className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center"
+          >
             <button
               data-cta
               onClick={reset}
@@ -196,9 +202,7 @@ export default function Error({ error, reset }: ErrorProps) {
               className="pointer-events-none absolute bottom-full right-0"
               style={fillet}
             />
-            <span className="text-sm text-[#07140F]/50">
-              InsureCow
-            </span>
+            <span className="text-sm text-[#07140F]/50">InsureCow</span>
           </div>
         </div>
       </div>
